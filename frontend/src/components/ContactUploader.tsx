@@ -1,5 +1,9 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Button } from "./ui/button";
+import { getUserModules } from "../lib/firebase";
+import type { VoiceModule } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
+import { getUserProfile, decrementUserTokens } from "../lib/firebase";
 
 interface Contact {
   name: string;
@@ -14,15 +18,10 @@ interface ContactUploaderProps {
 
 const CSV_TEMPLATE = "name,phone\nAbhigyan Raj,9234567890\nSandeep Mehta,9876543210";
 
-// Simulated modules list
-const modules = [
-  { id: "1", name: "Customer Feedback" },
-  { id: "2", name: "Order Confirmation" },
-  { id: "3", name: "Appointment Reminder" },
-];
-
 const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) => {
-  const [selectedModule, setSelectedModule] = useState(modules[0].id);
+  const { user } = useAuth();
+  const [modules, setModules] = useState<VoiceModule[]>([]);
+  const [selectedModule, setSelectedModule] = useState<string>("");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [manualName, setManualName] = useState("");
   const [manualPhone, setManualPhone] = useState("");
@@ -31,6 +30,29 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) 
   const [dragActive, setDragActive] = useState(false);
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [tokenError, setTokenError] = useState("");
+  const [loadingModules, setLoadingModules] = useState(true);
+  const [userTokens, setUserTokens] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchModules = async () => {
+      if (!user) return;
+      setLoadingModules(true);
+      const mods = await getUserModules(user.uid);
+      setModules(mods);
+      setLoadingModules(false);
+      if (mods.length > 0) setSelectedModule(mods[0].id!);
+    };
+    fetchModules();
+    // Fetch user tokens
+    const fetchTokens = async () => {
+      if (user) {
+        const profile = await getUserProfile(user.uid);
+        setUserTokens(profile ? profile.tokens : 0);
+      }
+    };
+    fetchTokens();
+  }, [user]);
 
   // Minimal CSV parser: expects header row with 'name' and 'phone' columns
   const parseCSV = (csv: string) => {
@@ -99,18 +121,35 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) 
     setContacts(cs => cs.map((c, i) => i === idx ? { ...c, selected: checked } : c));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
+    setTokenError("");
+    let needed = 1;
+    let count = 1;
     if (contacts.length > 0) {
       const selected = contacts.filter(c => c.selected);
+      count = selected.length;
+      needed = count;
       if (selected.length === 0) {
         setError("Select at least one contact");
         return;
       }
+    }
+    if (!user || userTokens === null) {
+      setTokenError("Unable to fetch your tokens. Please try again.");
+      return;
+    }
+    if (userTokens < needed) {
+      setTokenError(`Not enough tokens! You need ${needed}, but have only ${userTokens}. Please buy more tokens.`);
+      return;
+    }
+    if (contacts.length > 0) {
+      const selected = contacts.filter(c => c.selected);
       setSuccess(`Ready to call ${selected.length} contact(s)!`);
-      setTimeout(() => {
+      setTimeout(async () => {
+        await decrementUserTokens(user.uid, selected.length);
         setSuccess("");
         onSubmit(selected.map(({ name, phone }) => ({ name, phone })));
         onClose();
@@ -123,7 +162,8 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) 
       return;
     }
     setSuccess("Ready to call 1 contact!");
-    setTimeout(() => {
+    setTimeout(async () => {
+      await decrementUserTokens(user.uid, 1);
       setSuccess("");
       onSubmit([{ name: manualName, phone: manualPhone }]);
       onClose();
@@ -139,21 +179,27 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) 
     : contacts;
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:gap-5 w-full max-w-md mx-auto p-2 sm:p-0">
       {/* Module select */}
       <div className="flex flex-col gap-1">
         <label className="text-sm text-white/80 font-medium">Select Module:</label>
         <select
           value={selectedModule}
           onChange={e => setSelectedModule(e.target.value)}
-          className="rounded-lg border border-zinc-700 px-3 py-2 text-sm bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-400/20"
+          className="rounded-lg border border-zinc-700 px-3 py-2 text-xs sm:text-sm bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-400/20 w-full"
         >
-          {modules.map(m => (
-            <option key={m.id} value={m.id}>{m.name}</option>
-          ))}
+          {loadingModules ? (
+            <option value="">Loading modules...</option>
+          ) : modules.length === 0 ? (
+            <option value="">No modules found. Please add one in your settings.</option>
+          ) : (
+            modules.map(m => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))
+          )}
         </select>
       </div>
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
         <label className="text-sm text-white/80 font-medium">Upload CSV (name, phone):</label>
         <a
           href={`data:text/csv;charset=utf-8,${encodeURIComponent(CSV_TEMPLATE)}`}
@@ -164,7 +210,7 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) 
         </a>
       </div>
       <div
-        className={`rounded-lg border-2 border-dashed ${dragActive ? "border-blue-400 bg-blue-950/30" : "border-zinc-700 bg-zinc-900"} px-4 py-6 text-center cursor-pointer transition-colors`}
+        className={`rounded-lg border-2 border-dashed ${dragActive ? "border-blue-400 bg-blue-950/30" : "border-zinc-700 bg-zinc-900"} px-2 sm:px-4 py-4 sm:py-6 text-center cursor-pointer transition-colors w-full`}
         onClick={() => fileInputRef.current?.click()}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -186,7 +232,7 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) 
             placeholder="Search contacts..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="mb-2 w-full rounded border border-zinc-700 px-3 py-1 text-xs bg-zinc-800 text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20"
+            className="mb-2 w-full rounded border border-zinc-700 px-3 py-1 text-xs sm:text-sm bg-zinc-800 text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20"
           />
           <div className="flex items-center mb-2">
             <input
@@ -197,11 +243,11 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) 
             />
             <span className="text-xs text-white/70">Select All</span>
           </div>
-          <div className="max-h-40 overflow-y-auto flex flex-col gap-1">
+          <div className="max-h-40 overflow-y-auto flex flex-col gap-1 w-full">
             {filteredContacts.map((c, idx) => (
               <label
                 key={idx}
-                className={`flex items-center gap-2 text-xs px-2 py-1 rounded transition-colors ${c.selected ? "bg-blue-900/30 text-blue-200" : "text-white/80 hover:bg-zinc-800"}`}
+                className={`flex items-center gap-2 text-xs sm:text-sm px-2 py-1 rounded transition-colors w-full ${c.selected ? "bg-blue-900/30 text-blue-200" : "text-white/80 hover:bg-zinc-800"}`}
                 style={{ cursor: "pointer" }}
               >
                 <input
@@ -228,20 +274,21 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) 
             placeholder="Name"
             value={manualName}
             onChange={e => setManualName(e.target.value)}
-            className="rounded-lg border border-zinc-700 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/30 bg-zinc-800 text-white placeholder-zinc-400"
+            className="rounded-lg border border-zinc-700 px-4 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/30 bg-zinc-800 text-white placeholder-zinc-400 w-full"
           />
           <input
             type="tel"
             placeholder="Phone Number"
             value={manualPhone}
             onChange={e => setManualPhone(e.target.value)}
-            className="rounded-lg border border-zinc-700 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/30 bg-zinc-800 text-white placeholder-zinc-400"
+            className="rounded-lg border border-zinc-700 px-4 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/30 bg-zinc-800 text-white placeholder-zinc-400 w-full"
           />
         </>
       )}
       {error && <div className="text-red-400 text-xs text-center font-medium">{error}</div>}
       {success && <div className="text-green-400 text-xs text-center font-medium">{success}</div>}
-      <Button type="submit" className="mt-2 rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors">Submit</Button>
+      {tokenError && <div className="text-red-400 text-xs text-center font-medium">{tokenError}</div>}
+      <Button type="submit" className="mt-2 rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors w-full sm:w-auto text-xs sm:text-base">Submit</Button>
     </form>
   );
 };
