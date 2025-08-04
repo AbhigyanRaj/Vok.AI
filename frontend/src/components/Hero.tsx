@@ -54,9 +54,6 @@ const Hero: React.FC = () => {
             <Zap className="w-3 h-3 mr-1" />
             AI Voice Automation Platform
           </Badge>
-          <div className="mb-4 text-xs text-white/50 font-light">
-            Under Development • Built by Abhigyan • IIIT Delhi
-          </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold mb-4 tracking-tight md:tracking-tighter text-white font-[Sora] select-none">
             <span className="font-extrabold tracking-[-0.04em] drop-shadow-sm" style={{fontFamily: 'Sora, sans-serif'}}>Vok</span>
             <span className="font-medium tracking-[-0.04em] drop-shadow-sm" style={{fontFamily: 'Sora, sans-serif'}}>.ai</span>
@@ -136,6 +133,16 @@ const Hero: React.FC = () => {
           </Modal>
           {/* Create Module Modal */}
           <CreateModule open={createModuleOpen} onClose={() => setCreateModuleOpen(false)} />
+          
+          {/* Development Status */}
+          <div className="mt-8 flex items-center justify-center">
+            <div className="text-xs text-white/40 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-full border border-white/10">
+              <span className="mr-2">Under Development</span>
+              <span className="text-white/30">•</span>
+              <span className="ml-2">Built by Abhigyan | IIIT Delhi</span>
+            </div>
+          </div>
+          
           {/* Trust indicators */}
           <div className="mt-12 flex items-center justify-center space-x-6 text-xs text-white/50">
             <span className="flex items-center">
