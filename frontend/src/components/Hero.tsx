@@ -54,6 +54,9 @@ const Hero: React.FC = () => {
             <Zap className="w-3 h-3 mr-1" />
             AI Voice Automation Platform
           </Badge>
+          <div className="mb-4 text-xs text-white/50 font-light">
+            Under Development • Built by Abhigyan • IIIT Delhi
+          </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold mb-4 tracking-tight md:tracking-tighter text-white font-[Sora] select-none">
             <span className="font-extrabold tracking-[-0.04em] drop-shadow-sm" style={{fontFamily: 'Sora, sans-serif'}}>Vok</span>
             <span className="font-medium tracking-[-0.04em] drop-shadow-sm" style={{fontFamily: 'Sora, sans-serif'}}>.ai</span>
