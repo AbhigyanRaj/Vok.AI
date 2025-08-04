@@ -7,16 +7,16 @@
 
 **Voice-powered communication & productivity platform**
 
-> **Status: Under Development** 🚧  
-> Built with ❤️ by [Abhigyan](https://github.com/AbhigyanRaj) | IIIT Delhi
+> **Status: Under Development**  
+> Built by [Abhigyan](https://github.com/AbhigyanRaj) | IIIT Delhi
 
 ---
 
-## 🎯 Project Overview
+## Project Overview
 
 Vok.AI is a comprehensive voice automation platform that enables businesses to create custom call scripts, automate outbound calls, and analyze call responses using AI. The platform combines voice technology with AI-powered transcription and analytics to streamline customer communication workflows.
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 graph TB
@@ -55,7 +55,7 @@ graph TB
     H --> L
 ```
 
-## 🚀 Features
+## Features
 
 ### Core Functionality
 - **Voice Module Creation**: Create custom call scripts with multiple questions
@@ -70,7 +70,7 @@ graph TB
 - **Responsive Design**: Works seamlessly across all devices
 - **Google OAuth**: Secure authentication system
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Frontend
 - **React 19** - Modern UI framework
@@ -92,7 +92,7 @@ graph TB
 - **OpenAI GPT** - Call summarization
 - **MongoDB Atlas** - Cloud database
 
-## 📊 System Flow
+## System Flow
 
 ```mermaid
 sequenceDiagram
@@ -120,30 +120,30 @@ sequenceDiagram
     B->>F: Call Complete
 ```
 
-## 🚧 Development Status
+## Development Status
 
-### ✅ Completed
+### Completed
 - [x] Frontend UI/UX design
 - [x] Module creation and management
 - [x] User authentication system
 - [x] Token-based billing UI
 - [x] Responsive design implementation
 
-### 🔄 In Progress
+### In Progress
 - [ ] Backend API development
 - [ ] Twilio integration
 - [ ] OpenAI integration
 - [ ] Database schema implementation
 - [ ] Call analytics dashboard
 
-### 📋 Planned
+### Planned
 - [ ] Voice call functionality
 - [ ] Real-time transcription
 - [ ] AI-powered insights
 - [ ] Advanced analytics
 - [ ] Multi-tenant support
 
-## 🏃‍♂️ Getting Started
+## Getting Started
 
 ### Prerequisites
 - Node.js (v18+)
@@ -167,7 +167,7 @@ cp env.example .env
 npm run dev
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Vok.AI/
@@ -188,7 +188,7 @@ Vok.AI/
 └── README.md
 ```
 
-## 🔧 Environment Variables
+## Environment Variables
 
 ### Frontend
 ```env
@@ -205,11 +205,11 @@ TWILIO_AUTH_TOKEN=your_twilio_token
 OPENAI_API_KEY=your_openai_key
 ```
 
-## 🤝 Contributing
+## Contributing
 
 This project is currently under active development. For questions or collaboration, please reach out to [Abhigyan](https://github.com/AbhigyanRaj).
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License.
 
