@@ -1,0 +1,5 @@
+\textbf{Vok.AI: Voice Automation Platform} \textbar{} \emph{React.js, TypeScript, Node.js, Express, MongoDB, Twilio, OpenAI} & (December 2024 \textendash\ Present)\\
+     & Team Size: 1 \\
+    \multicolumn{1}{p{0.76\textwidth}}{
+        Built a voice automation platform enabling businesses to create custom call scripts and automate outbound calls. Implemented token-based billing system, real-time module management, and integrated Twilio for voice calls with OpenAI Whisper for transcription. Developed RESTful APIs using Express.js and MongoDB, achieving 95\% code coverage with TypeScript.
+    } & \href{https://vokai.vercel.app}{\textbf{Live}} \textbar{} \href{https://github.com/AbhigyanRaj/Vok.AI}{\textbf{Github}} \textbar{} \href{https://youtu.be/demo-video}{\textbf{Demo}}\\\\ 
