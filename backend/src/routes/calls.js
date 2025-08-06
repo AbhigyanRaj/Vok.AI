@@ -843,6 +843,88 @@ router.post('/:id/status', protect, async (req, res) => {
   }
 });
 
+// Delete a call
+router.delete('/:id', protect, async (req, res) => {
+  try {
+    const callId = req.params.id;
+    const userId = req.user._id;
+
+    // Find the call and verify ownership
+    const call = await Call.findById(callId);
+    if (!call) {
+      return res.status(404).json({ error: 'Call not found' });
+    }
+
+    // Check if the call belongs to the user
+    if (call.userId.toString() !== userId.toString()) {
+      return res.status(403).json({ error: 'Access denied to this call' });
+    }
+
+    // Delete the call
+    await Call.findByIdAndDelete(callId);
+
+    console.log(`✅ Call ${callId} deleted by user ${userId}`);
+
+    res.json({
+      success: true,
+      message: 'Call deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete call error:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete call',
+      message: error.message 
+    });
+  }
+});
+
+// Delete multiple calls
+router.delete('/batch/delete', protect, async (req, res) => {
+  try {
+    const { callIds } = req.body;
+    const userId = req.user._id;
+
+    if (!callIds || !Array.isArray(callIds) || callIds.length === 0) {
+      return res.status(400).json({ 
+        error: 'Invalid request',
+        message: 'callIds array is required' 
+      });
+    }
+
+    // Find all calls and verify ownership
+    const calls = await Call.find({ 
+      _id: { $in: callIds },
+      userId: userId 
+    });
+
+    if (calls.length === 0) {
+      return res.status(404).json({ error: 'No calls found to delete' });
+    }
+
+    // Delete all calls
+    await Call.deleteMany({ 
+      _id: { $in: callIds },
+      userId: userId 
+    });
+
+    console.log(`✅ ${calls.length} calls deleted by user ${userId}`);
+
+    res.json({
+      success: true,
+      message: `${calls.length} calls deleted successfully`,
+      deletedCount: calls.length
+    });
+
+  } catch (error) {
+    console.error('Batch delete calls error:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete calls',
+      message: error.message 
+    });
+  }
+});
+
 // Health check endpoint
 router.get('/health', (req, res) => {
   try {

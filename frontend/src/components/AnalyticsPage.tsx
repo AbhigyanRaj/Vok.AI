@@ -17,7 +17,11 @@ import {
   Eye,
   Mic,
   MessageSquare,
-  Activity
+  Activity,
+  Trash2,
+  AlertTriangle,
+  Check,
+  X
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import * as auth from "../lib/auth";
@@ -64,6 +68,10 @@ const AnalyticsPage: React.FC = () => {
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('month');
   const [selectedModule, setSelectedModule] = useState<string>('all');
   const [error, setError] = useState("");
+  const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingCall, setDeletingCall] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchAnalyticsData = async () => {
     if (!user) return;
@@ -190,6 +198,91 @@ const AnalyticsPage: React.FC = () => {
   useEffect(() => {
     fetchAnalyticsData();
   }, [user, timeRange, selectedModule]);
+
+  const deleteCall = async (callId: string) => {
+    try {
+      setDeletingCall(callId);
+      const token = auth.getStoredToken();
+      
+      const response = await fetch(`${process.env.NODE_ENV === 'production' 
+        ? 'https://vok-ai.onrender.com/api'
+        : 'http://localhost:5001/api'}/calls/${callId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Refresh analytics data
+        await fetchAnalyticsData();
+        setSelectedCalls(prev => prev.filter(id => id !== callId));
+      } else {
+        setError(data.error || 'Failed to delete call');
+      }
+    } catch (error) {
+      console.error('Error deleting call:', error);
+      setError('Failed to delete call');
+    } finally {
+      setDeletingCall(null);
+    }
+  };
+
+  const deleteSelectedCalls = async () => {
+    if (selectedCalls.length === 0) return;
+    
+    try {
+      setDeleting(true);
+      const token = auth.getStoredToken();
+      
+      const response = await fetch(`${process.env.NODE_ENV === 'production' 
+        ? 'https://vok-ai.onrender.com/api'
+        : 'http://localhost:5001/api'}/calls/batch/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ callIds: selectedCalls }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Refresh analytics data
+        await fetchAnalyticsData();
+        setSelectedCalls([]);
+        setShowDeleteConfirm(false);
+      } else {
+        setError(data.error || 'Failed to delete calls');
+      }
+    } catch (error) {
+      console.error('Error deleting calls:', error);
+      setError('Failed to delete calls');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const toggleCallSelection = (callId: string) => {
+    setSelectedCalls(prev => 
+      prev.includes(callId) 
+        ? prev.filter(id => id !== callId)
+        : [...prev, callId]
+    );
+  };
+
+  const selectAllCalls = () => {
+    if (analyticsData?.recentCalls) {
+      setSelectedCalls(analyticsData.recentCalls.map(call => call._id));
+    }
+  };
+
+  const deselectAllCalls = () => {
+    setSelectedCalls([]);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -442,11 +535,63 @@ const AnalyticsPage: React.FC = () => {
         <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
             <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">Recent Calls</h3>
-            <Button variant="outline" size="sm" className="text-xs sm:text-sm px-3 py-2">
-              <Eye className="w-4 h-4 mr-2" />
-              View All
-            </Button>
+            <div className="flex items-center gap-2">
+              {selectedCalls.length > 0 && (
+                <>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="text-xs sm:text-sm px-3 py-2 text-red-400 border-red-500/30 hover:bg-red-500/10"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Selected ({selectedCalls.length})
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={deselectAllCalls}
+                    className="text-xs sm:text-sm px-3 py-2"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Clear
+                  </Button>
+                </>
+              )}
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm px-3 py-2">
+                <Eye className="w-4 h-4 mr-2" />
+                View All
+              </Button>
+            </div>
           </div>
+          
+          {/* Selection Controls */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={selectAllCalls}
+                className="text-xs sm:text-sm px-3 py-2"
+              >
+                Select All
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={deselectAllCalls}
+                className="text-xs sm:text-sm px-3 py-2"
+              >
+                Deselect All
+              </Button>
+            </div>
+            {selectedCalls.length > 0 && (
+              <span className="text-xs text-zinc-400">
+                {selectedCalls.length} call{selectedCalls.length !== 1 ? 's' : ''} selected
+              </span>
+            )}
+          </div>
+
           <div className="overflow-x-auto -mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
               <div className="overflow-hidden">
@@ -454,17 +599,34 @@ const AnalyticsPage: React.FC = () => {
                   <table className="min-w-full divide-y divide-zinc-800">
                     <thead>
                       <tr className="border-b border-zinc-800">
+                        <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">
+                          <input
+                            type="checkbox"
+                            checked={selectedCalls.length === analyticsData.recentCalls.length}
+                            onChange={(e) => e.target.checked ? selectAllCalls() : deselectAllCalls()}
+                            className="w-4 h-4 text-blue-600 bg-zinc-800 border-zinc-600 rounded focus:ring-blue-500 focus:ring-2"
+                          />
+                        </th>
                         <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Module</th>
                         <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Customer</th>
                         <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Status</th>
                         <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Duration</th>
                         <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Questions</th>
                         <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Date</th>
+                        <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-800/50">
                       {analyticsData.recentCalls.map((call) => (
                         <tr key={call._id} className="hover:bg-zinc-800/30 transition-colors">
+                          <td className="py-3 px-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedCalls.includes(call._id)}
+                              onChange={() => toggleCallSelection(call._id)}
+                              className="w-4 h-4 text-blue-600 bg-zinc-800 border-zinc-600 rounded focus:ring-blue-500 focus:ring-2"
+                            />
+                          </td>
                           <td className="py-3 px-2">
                             <span className="text-xs sm:text-sm text-white truncate block max-w-[100px] sm:max-w-[120px]">{call.moduleName || 'Unknown Module'}</span>
                           </td>
@@ -484,25 +646,40 @@ const AnalyticsPage: React.FC = () => {
                           <td className="py-3 px-2">
                             <span className="text-xs sm:text-sm text-white">{formatDuration(call.duration)}</span>
                           </td>
-                                                  <td className="py-3 px-2">
-                          <span className="text-xs sm:text-sm text-white">{call.questionsAnswered}/{call.totalQuestions}</span>
-                        </td>
-                        <td className="py-3 px-2">
-                          <span className="text-xs text-zinc-400">{formatDate(call.createdAt)}</span>
-                          {call.transcription && (
-                            <div className="mt-1">
-                              <details className="text-xs">
-                                <summary className="cursor-pointer text-blue-400 hover:text-blue-300">View Conversation</summary>
-                                <div className="mt-2 p-2 bg-zinc-800 rounded text-xs whitespace-pre-wrap max-h-32 overflow-y-auto max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg">
-                                  <div className="text-green-400 font-medium mb-1">Conversation:</div>
-                                  <div className="text-zinc-300 leading-relaxed">
-                                    {call.transcription}
+                          <td className="py-3 px-2">
+                            <span className="text-xs sm:text-sm text-white">{call.questionsAnswered}/{call.totalQuestions}</span>
+                          </td>
+                          <td className="py-3 px-2">
+                            <span className="text-xs text-zinc-400">{formatDate(call.createdAt)}</span>
+                            {call.transcription && (
+                              <div className="mt-1">
+                                <details className="text-xs">
+                                  <summary className="cursor-pointer text-blue-400 hover:text-blue-300">View Conversation</summary>
+                                  <div className="mt-2 p-2 bg-zinc-800 rounded text-xs whitespace-pre-wrap max-h-32 overflow-y-auto max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg">
+                                    <div className="text-green-400 font-medium mb-1">Conversation:</div>
+                                    <div className="text-zinc-300 leading-relaxed">
+                                      {call.transcription}
+                                    </div>
                                   </div>
-                                </div>
-                              </details>
-                            </div>
-                          )}
-                        </td>
+                                </details>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => deleteCall(call._id)}
+                              disabled={deletingCall === call._id}
+                              className="text-xs sm:text-sm px-2 py-1 text-red-400 border-red-500/30 hover:bg-red-500/10"
+                            >
+                              {deletingCall === call._id ? (
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3 h-3" />
+                              )}
+                            </Button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -517,6 +694,48 @@ const AnalyticsPage: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 max-w-md mx-4">
+            <div className="flex items-center mb-4">
+              <AlertTriangle className="w-6 h-6 text-red-400 mr-3" />
+              <h3 className="text-lg font-semibold text-white">Delete Calls</h3>
+            </div>
+            <p className="text-zinc-300 mb-6">
+              Are you sure you want to delete {selectedCalls.length} call{selectedCalls.length !== 1 ? 's' : ''}? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                onClick={deleteSelectedCalls}
+                disabled={deleting}
+                className="bg-red-600 hover:bg-red-700 flex-1"
+              >
+                {deleting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
