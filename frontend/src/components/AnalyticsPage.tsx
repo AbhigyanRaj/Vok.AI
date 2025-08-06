@@ -619,12 +619,12 @@ const AnalyticsPage: React.FC = () => {
 
           <div className="overflow-x-auto -mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
-              <div className="overflow-hidden">
+              <div className="overflow-hidden border border-zinc-800 rounded-lg">
                 {analyticsData?.recentCalls.length > 0 ? (
                   <table className="min-w-full divide-y divide-zinc-800">
-                    <thead>
-                      <tr className="border-b border-zinc-800">
-                        <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">
+                    <thead className="bg-zinc-900/50">
+                      <tr>
+                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">
                           <input
                             type="checkbox"
                             checked={selectedCalls.length === analyticsData.recentCalls.length}
@@ -632,18 +632,18 @@ const AnalyticsPage: React.FC = () => {
                             className="w-4 h-4 text-blue-600 bg-zinc-800 border-zinc-600 rounded focus:ring-blue-500 focus:ring-2"
                           />
                         </th>
-                        <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Module</th>
-                        <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Customer</th>
-                        <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Status</th>
-                        <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Duration</th>
-                        <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Date</th>
-                        <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Actions</th>
+                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Module</th>
+                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Customer</th>
+                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Status</th>
+                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Duration</th>
+                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Date</th>
+                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-800/50">
+                    <tbody className="divide-y divide-zinc-800/50 bg-zinc-900/30">
                       {analyticsData.recentCalls.map((call) => (
                         <tr key={call._id} className="hover:bg-zinc-800/30 transition-colors">
-                          <td className="py-3 px-2">
+                          <td className="py-4 px-4">
                             <input
                               type="checkbox"
                               checked={selectedCalls.includes(call._id)}
@@ -651,48 +651,91 @@ const AnalyticsPage: React.FC = () => {
                               className="w-4 h-4 text-blue-600 bg-zinc-800 border-zinc-600 rounded focus:ring-blue-500 focus:ring-2"
                             />
                           </td>
-                          <td className="py-3 px-2">
-                            <span className="text-xs sm:text-sm text-white truncate block max-w-[100px] sm:max-w-[120px]">{call.moduleName || 'Unknown Module'}</span>
+                          <td className="py-4 px-4">
+                            <span className="text-xs sm:text-sm text-white truncate block max-w-[120px] sm:max-w-[150px]">{call.moduleName || 'Unknown Module'}</span>
                           </td>
-                          <td className="py-3 px-2">
+                          <td className="py-4 px-4">
                             <div>
-                              <span className="text-xs sm:text-sm text-white block truncate max-w-[100px] sm:max-w-[120px]">{call.customerName}</span>
-                              <span className="text-xs text-zinc-400 truncate block max-w-[100px] sm:max-w-[120px]">{call.phoneNumber}</span>
+                              <span className="text-xs sm:text-sm text-white block truncate max-w-[120px] sm:max-w-[150px] font-medium">{call.customerName}</span>
+                              <span className="text-xs text-zinc-400 truncate block max-w-[120px] sm:max-w-[150px]">{call.phoneNumber}</span>
                             </div>
                           </td>
-                          <td className="py-3 px-2">
+                          <td className="py-4 px-4">
                             <Badge className={`text-xs ${getStatusColor(call.status)}`}>
                               <span className="mr-1">{getStatusIcon(call.status)}</span>
                               <span className="hidden sm:inline">{call.status}</span>
                               <span className="sm:hidden">{call.status.charAt(0)}</span>
                             </Badge>
                           </td>
-                          <td className="py-3 px-2">
-                            <span className="text-xs sm:text-sm text-white">{formatDuration(call.duration)}</span>
+                          <td className="py-4 px-4">
+                            <span className="text-xs sm:text-sm text-white font-medium">{formatDuration(call.duration)}</span>
                           </td>
-                          <td className="py-3 px-2">
+                          <td className="py-4 px-4">
                             <span className="text-xs text-zinc-400">{formatDate(call.createdAt)}</span>
                             {call.transcription && (
-                              <div className="mt-1">
-                                <details className="text-xs">
-                                  <summary className="cursor-pointer text-blue-400 hover:text-blue-300">View Conversation</summary>
-                                  <div className="mt-2 p-2 bg-zinc-800 rounded text-xs whitespace-pre-wrap max-h-32 overflow-y-auto max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg">
-                                    <div className="text-green-400 font-medium mb-1">Conversation:</div>
-                                    <div className="text-zinc-300 leading-relaxed">
-                                      {call.transcription}
+                              <div className="mt-2">
+                                <details className="group">
+                                  <summary className="cursor-pointer text-blue-400 hover:text-blue-300 font-medium text-sm flex items-center gap-1 transition-all duration-200">
+                                    <span className="group-open:hidden">View Conversation</span>
+                                    <span className="hidden group-open:inline">Hide Conversation</span>
+                                    <svg className="w-4 h-4 transition-transform duration-200 ease-out group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </summary>
+                                  <div className="mt-3 overflow-hidden transition-all duration-300 ease-out max-h-0 group-open:max-h-96">
+                                    <div className="p-4 bg-zinc-800/30 border border-zinc-700/50 rounded-lg">
+                                      <div className="flex items-center justify-between mb-3 pb-2 border-b border-zinc-700/50">
+                                        <h4 className="text-sm font-medium text-white">Call Transcript</h4>
+                                        <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">
+                                          {formatDuration(call.duration)}
+                                        </span>
+                                      </div>
+                                      <div className="space-y-3 max-h-32 overflow-y-auto">
+                                        {call.transcription.split('\n').map((line, index) => {
+                                          if (!line.trim()) return null;
+                                          
+                                          if (line.startsWith('VokAI:')) {
+                                            return (
+                                              <div key={index} className="flex items-start gap-2">
+                                                <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
+                                                <div className="flex-1">
+                                                  <span className="text-xs text-blue-400 font-medium">VokAI</span>
+                                                  <div className="text-sm text-zinc-200 mt-1">{line.replace('VokAI:', '').trim()}</div>
+                                                </div>
+                                              </div>
+                                            );
+                                          } else if (line.startsWith('User:')) {
+                                            return (
+                                              <div key={index} className="flex items-start gap-2">
+                                                <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                                                <div className="flex-1">
+                                                  <span className="text-xs text-green-400 font-medium">Customer</span>
+                                                  <div className="text-sm text-zinc-200 mt-1">{line.replace('User:', '').trim()}</div>
+                                                </div>
+                                              </div>
+                                            );
+                                          } else {
+                                            return (
+                                              <div key={index} className="text-xs text-zinc-500 italic pl-4">
+                                                {line}
+                                              </div>
+                                            );
+                                          }
+                                        })}
+                                      </div>
                                     </div>
                                   </div>
                                 </details>
                               </div>
                             )}
                           </td>
-                          <td className="py-3 px-2">
+                          <td className="py-4 px-4">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => deleteCall(call._id)}
                               disabled={deletingCall === call._id}
-                              className="text-xs sm:text-sm px-2 py-1 text-red-400 border-red-500/30 hover:bg-red-500/10"
+                              className="text-xs sm:text-sm px-3 py-2 text-red-400 border-red-500/30 hover:bg-red-500/10"
                             >
                               {deletingCall === call._id ? (
                                 <RefreshCw className="w-3 h-3 animate-spin" />
@@ -706,8 +749,9 @@ const AnalyticsPage: React.FC = () => {
                     </tbody>
                   </table>
                 ) : (
-                  <div className="text-center py-8">
-                    <p className="text-zinc-400 text-sm">No calls found</p>
+                  <div className="text-center py-12">
+                    <div className="text-zinc-400 mb-2">No calls found</div>
+                    <p className="text-xs text-zinc-500">Try adjusting your time range or filters</p>
                   </div>
                 )}
               </div>
