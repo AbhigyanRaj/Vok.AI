@@ -11,21 +11,18 @@ import {
   CheckCircle, 
   XCircle, 
   Calendar,
-  Download,
-  Filter,
   RefreshCw,
   Eye,
-  Mic,
-  MessageSquare,
-  Activity,
   Trash2,
   AlertTriangle,
-  Check,
-  X
+  X,
+  Activity,
+  PieChart,
+  BarChart,
+  LineChart
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import * as auth from "../lib/auth";
-import { api } from "../lib/api";
 
 interface CallData {
   _id: string;
@@ -34,8 +31,6 @@ interface CallData {
   phoneNumber: string;
   status: 'completed' | 'failed' | 'in-progress' | 'initiated' | 'ringing' | 'answered' | 'busy' | 'no-answer' | 'canceled';
   duration: number;
-  questionsAnswered: number;
-  totalQuestions: number;
   createdAt: string;
   completedAt?: string;
   responses?: Map<string, string>;
@@ -52,13 +47,13 @@ interface AnalyticsData {
   completedCalls: number;
   failedCalls: number;
   averageDuration: number;
-  totalQuestions: number;
-  averageQuestionsAnswered: number;
   successRate: number;
   callsThisWeek: number;
   callsThisMonth: number;
   topModules: Array<{ name: string; calls: number }>;
   recentCalls: CallData[];
+  statusDistribution: Array<{ status: string; count: number; percentage: number }>;
+  dailyCalls: Array<{ date: string; count: number }>;
 }
 
 const AnalyticsPage: React.FC = () => {
@@ -66,7 +61,6 @@ const AnalyticsPage: React.FC = () => {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('month');
-  const [selectedModule, setSelectedModule] = useState<string>('all');
   const [error, setError] = useState("");
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -106,29 +100,33 @@ const AnalyticsPage: React.FC = () => {
       // Process the call data to create analytics
       const calls = data.calls || [];
       
-      // Calculate analytics from real data
-      const totalCalls = calls.length;
-      const completedCalls = calls.filter((call: CallData) => call.status === 'completed').length;
-      const failedCalls = calls.filter((call: CallData) => ['failed', 'busy', 'no-answer', 'canceled'].includes(call.status)).length;
+      // Filter calls based on time range
+      const now = new Date();
+      let filteredCalls = calls;
       
-      const totalDuration = calls.reduce((sum: number, call: CallData) => sum + (call.duration || 0), 0);
+      if (timeRange === 'week') {
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        filteredCalls = calls.filter((call: CallData) => new Date(call.createdAt) >= weekAgo);
+      } else if (timeRange === 'month') {
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        filteredCalls = calls.filter((call: CallData) => new Date(call.createdAt) >= monthAgo);
+      } else if (timeRange === 'year') {
+        const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        filteredCalls = calls.filter((call: CallData) => new Date(call.createdAt) >= yearAgo);
+      }
+      
+      // Calculate analytics from filtered data
+      const totalCalls = filteredCalls.length;
+      const completedCalls = filteredCalls.filter((call: CallData) => call.status === 'completed').length;
+      const failedCalls = filteredCalls.filter((call: CallData) => ['failed', 'busy', 'no-answer', 'canceled'].includes(call.status)).length;
+      
+      // Fix duration calculation - duration is in seconds, convert to minutes
+      const totalDuration = filteredCalls.reduce((sum: number, call: CallData) => sum + (call.duration || 0), 0);
       const averageDuration = totalCalls > 0 ? totalDuration / totalCalls : 0;
-      
-      const totalQuestions = calls.reduce((sum: number, call: CallData) => {
-        // Count questions based on transcription or responses
-        if (call.transcription) {
-          const questionMatches = call.transcription.match(/VokAI: Question \d+:/g);
-          return sum + (questionMatches ? questionMatches.length : 0);
-        }
-        return sum + (call.responses ? call.responses.size : 0);
-      }, 0);
-      
-      const averageQuestionsAnswered = totalCalls > 0 ? totalQuestions / totalCalls : 0;
       
       const successRate = totalCalls > 0 ? (completedCalls / totalCalls) * 100 : 0;
       
       // Calculate time-based metrics
-      const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       
@@ -142,7 +140,7 @@ const AnalyticsPage: React.FC = () => {
       
       // Calculate top modules
       const moduleStats: { [key: string]: number } = {};
-      calls.forEach((call: CallData) => {
+      filteredCalls.forEach((call: CallData) => {
         const moduleName = call.moduleName || 'Unknown Module';
         moduleStats[moduleName] = (moduleStats[moduleName] || 0) + 1;
       });
@@ -152,37 +150,46 @@ const AnalyticsPage: React.FC = () => {
         .sort((a, b) => b.calls - a.calls)
         .slice(0, 5);
       
+      // Calculate status distribution
+      const statusCounts: { [key: string]: number } = {};
+      filteredCalls.forEach((call: CallData) => {
+        statusCounts[call.status] = (statusCounts[call.status] || 0) + 1;
+      });
+      
+      const statusDistribution = Object.entries(statusCounts).map(([status, count]) => ({
+        status,
+        count,
+        percentage: totalCalls > 0 ? (count / totalCalls) * 100 : 0
+      }));
+      
+      // Calculate daily calls for the last 7 days
+      const dailyCalls = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const dateStr = date.toISOString().split('T')[0];
+        const dayCalls = filteredCalls.filter((call: CallData) => 
+          call.createdAt.startsWith(dateStr)
+        ).length;
+        dailyCalls.push({ date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), count: dayCalls });
+      }
+      
       // Get recent calls (last 10)
-      const recentCalls = calls
+      const recentCalls = filteredCalls
         .sort((a: CallData, b: CallData) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 10)
-        .map((call: CallData) => {
-          // Calculate questions from transcription
-          let totalQuestions = 5; // Default
-          if (call.transcription) {
-            const questionMatches = call.transcription.match(/VokAI: Question \d+:/g);
-            totalQuestions = questionMatches ? questionMatches.length : 5;
-          }
-          
-          return {
-            ...call,
-            questionsAnswered: call.responses ? call.responses.size : 0,
-            totalQuestions: totalQuestions,
-          };
-        });
+        .slice(0, 10);
 
       const processedData: AnalyticsData = {
         totalCalls,
         completedCalls,
         failedCalls,
         averageDuration,
-        totalQuestions,
-        averageQuestionsAnswered,
         successRate,
         callsThisWeek,
         callsThisMonth,
         topModules,
         recentCalls,
+        statusDistribution,
+        dailyCalls,
       };
 
       setAnalyticsData(processedData);
@@ -197,7 +204,7 @@ const AnalyticsPage: React.FC = () => {
 
   useEffect(() => {
     fetchAnalyticsData();
-  }, [user, timeRange, selectedModule]);
+  }, [user, timeRange]);
 
   const deleteCall = async (callId: string) => {
     try {
@@ -216,7 +223,6 @@ const AnalyticsPage: React.FC = () => {
       const data = await response.json();
       
       if (data.success) {
-        // Refresh analytics data
         await fetchAnalyticsData();
         setSelectedCalls(prev => prev.filter(id => id !== callId));
       } else {
@@ -251,7 +257,6 @@ const AnalyticsPage: React.FC = () => {
       const data = await response.json();
       
       if (data.success) {
-        // Refresh analytics data
         await fetchAnalyticsData();
         setSelectedCalls([]);
         setShowDeleteConfirm(false);
@@ -314,9 +319,11 @@ const AnalyticsPage: React.FC = () => {
     }
   };
 
-  const formatDuration = (minutes: number) => {
-    const mins = Math.floor(minutes);
-    const secs = Math.round((minutes - mins) * 60);
+  // Fix duration formatting - duration is in seconds
+  const formatDuration = (seconds: number) => {
+    if (!seconds || seconds === 0) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -375,7 +382,7 @@ const AnalyticsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 pt-20 sm:pt-24 ">
+    <div className="min-h-screen bg-zinc-950 px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 pt-20 sm:pt-24">
       <div className="w-full max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6 sm:mb-8 md:mb-10 mt-16">
@@ -384,31 +391,46 @@ const AnalyticsPage: React.FC = () => {
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2">Analytics Dashboard</h1>
               <p className="text-zinc-400 text-sm sm:text-base">Track your call performance and insights</p>
             </div>
-            <div className="flex flex-wrap gap-2 sm:gap-3 mt-4 sm:mt-0">
-              <Button variant="outline" size="sm" className="text-xs sm:text-sm px-3 py-2">
-                <Download className="w-4 h-4 mr-2" />
-                Export Data
-              </Button>
-              <Button variant="outline" size="sm" className="text-xs sm:text-sm px-3 py-2">
-                <Filter className="w-4 h-4 mr-2" />
-                Filter
+            <div className="flex items-center gap-2 mt-4 sm:mt-0">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fetchAnalyticsData}
+                className="text-xs sm:text-sm px-3 py-2"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
               </Button>
             </div>
           </div>
           
-          {/* Time Range Selector */}
-          <div className="flex flex-wrap gap-2">
-            {(['week', 'month', 'year'] as const).map((range) => (
-              <Button
-                key={range}
-                variant={timeRange === range ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTimeRange(range)}
-                className="text-xs sm:text-sm capitalize px-3 py-2"
-              >
-                {range}
-              </Button>
-            ))}
+          {/* Time Range Selector with Data Summary */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-wrap gap-2">
+              {(['week', 'month', 'year'] as const).map((range) => (
+                <Button
+                  key={range}
+                  variant={timeRange === range ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setTimeRange(range)}
+                  className={`text-xs sm:text-sm capitalize px-3 py-2 ${
+                    timeRange === range 
+                      ? "bg-white text-black hover:bg-gray-100" 
+                      : "bg-zinc-800 text-white border-zinc-700 hover:bg-zinc-700"
+                  }`}
+                >
+                  {range}
+                </Button>
+              ))}
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-zinc-400">
+                Showing {analyticsData?.totalCalls || 0} calls from the last {timeRange}
+              </p>
+              <p className="text-xs text-zinc-500">
+                Last updated: {new Date().toLocaleTimeString()}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -419,6 +441,7 @@ const AnalyticsPage: React.FC = () => {
               <div>
                 <p className="text-zinc-400 text-xs sm:text-sm">Total Calls</p>
                 <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{analyticsData?.totalCalls}</p>
+                <p className="text-xs text-zinc-500 mt-1">Last {timeRange}</p>
               </div>
               <div className="bg-blue-500/20 p-2 sm:p-3 rounded-full">
                 <PhoneCall className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
@@ -431,6 +454,7 @@ const AnalyticsPage: React.FC = () => {
               <div>
                 <p className="text-zinc-400 text-xs sm:text-sm">Success Rate</p>
                 <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{analyticsData?.successRate.toFixed(1)}%</p>
+                <p className="text-xs text-zinc-500 mt-1">{analyticsData?.completedCalls} completed</p>
               </div>
               <div className="bg-green-500/20 p-2 sm:p-3 rounded-full">
                 <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-green-400" />
@@ -442,7 +466,8 @@ const AnalyticsPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-zinc-400 text-xs sm:text-sm">Avg Duration</p>
-                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{analyticsData?.averageDuration.toFixed(1)}m</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{formatDuration(analyticsData?.averageDuration || 0)}</p>
+                <p className="text-xs text-zinc-500 mt-1">per call</p>
               </div>
               <div className="bg-yellow-500/20 p-2 sm:p-3 rounded-full">
                 <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-400" />
@@ -453,80 +478,84 @@ const AnalyticsPage: React.FC = () => {
           <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-zinc-400 text-xs sm:text-sm">Questions Answered</p>
-                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{analyticsData?.totalQuestions}</p>
+                <p className="text-zinc-400 text-xs sm:text-sm">Failed Calls</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{analyticsData?.failedCalls}</p>
+                <p className="text-xs text-zinc-500 mt-1">{analyticsData?.failedCalls > 0 ? `${((analyticsData.failedCalls / analyticsData.totalCalls) * 100).toFixed(1)}%` : '0%'} rate</p>
               </div>
-              <div className="bg-purple-500/20 p-2 sm:p-3 rounded-full">
-                <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400" />
+              <div className="bg-red-500/20 p-2 sm:p-3 rounded-full">
+                <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-400" />
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Charts and Detailed Analytics */}
+        {/* Charts and Visualizations */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {/* Top Modules Chart */}
+          {/* Daily Calls Chart */}
           <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4 sm:mb-6">
-              <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">Top Modules</h3>
-              <Badge variant="outline" className="text-xs">This {timeRange}</Badge>
+              <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">Daily Calls (Last 7 Days)</h3>
+              <Badge variant="outline" className="text-xs text-white">This {timeRange}</Badge>
             </div>
-            <div className="space-y-3 sm:space-y-4">
-              {analyticsData?.topModules.length > 0 ? (
-                analyticsData.topModules.map((module, index) => (
-                  <div key={module.name} className="flex items-center justify-between">
-                    <div className="flex items-center min-w-0 flex-1">
-                      <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-blue-500/20 flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
-                        <span className="text-xs font-medium text-blue-400">{index + 1}</span>
-                      </div>
-                      <span className="text-xs sm:text-sm md:text-base text-white truncate">{module.name}</span>
-                    </div>
-                    <div className="flex items-center ml-2">
-                      <div className="w-16 sm:w-20 md:w-24 bg-zinc-800 rounded-full h-2 mr-2 sm:mr-3">
+            <div className="space-y-3">
+              {analyticsData?.dailyCalls.length > 0 ? (
+                analyticsData.dailyCalls.map((day, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm text-white">{day.date}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 sm:w-32 bg-zinc-800 rounded-full h-2">
                         <div 
                           className="bg-blue-500 h-2 rounded-full" 
-                          style={{ width: `${(module.calls / (analyticsData?.topModules[0]?.calls || 1)) * 100}%` }}
+                          style={{ width: `${Math.max((day.count / Math.max(...analyticsData.dailyCalls.map(d => d.count), 1)) * 100, 5)}%` }}
                         ></div>
                       </div>
-                      <span className="text-xs sm:text-sm text-zinc-400 min-w-[2rem] text-right">{module.calls}</span>
+                      <span className="text-xs sm:text-sm text-zinc-400 min-w-[2rem] text-right">{day.count}</span>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-zinc-400 text-sm">No modules found</p>
+                <div className="text-center py-4">
+                  <p className="text-zinc-400 text-sm">No data for the last 7 days</p>
                 </div>
               )}
             </div>
+            <div className="mt-4 pt-4 border-t border-zinc-800">
+              <p className="text-xs text-zinc-500">
+                Total calls this week: {analyticsData?.dailyCalls.reduce((sum, day) => sum + day.count, 0) || 0}
+              </p>
+            </div>
           </Card>
 
-          {/* Call Status Distribution */}
+          {/* Status Distribution */}
           <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">Call Status</h3>
-              <Badge variant="outline" className="text-xs">Distribution</Badge>
+              <Badge variant="outline" className="text-xs text-white">Distribution</Badge>
             </div>
             <div className="space-y-3 sm:space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-green-500 rounded-full mr-2 sm:mr-3"></div>
-                  <span className="text-xs sm:text-sm md:text-base text-white">Completed</span>
+              {analyticsData?.statusDistribution.length > 0 ? (
+                analyticsData.statusDistribution.map((status) => (
+                  <div key={status.status} className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className={`w-3 h-3 rounded-full mr-2 sm:mr-3 ${getStatusColor(status.status).split(' ')[0]}`}></div>
+                      <span className="text-xs sm:text-sm md:text-base text-white capitalize">{status.status}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-xs sm:text-sm text-zinc-400 mr-2">{status.count}</span>
+                      <span className="text-xs text-zinc-500">({status.percentage.toFixed(1)}%)</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-zinc-400 text-sm">No status data available</p>
                 </div>
-                <div className="flex items-center">
-                  <span className="text-xs sm:text-sm text-zinc-400 mr-2">{analyticsData?.completedCalls}</span>
-                  <span className="text-xs text-zinc-500">({analyticsData?.successRate.toFixed(1)}%)</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-red-500 rounded-full mr-2 sm:mr-3"></div>
-                  <span className="text-xs sm:text-sm md:text-base text-white">Failed</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="text-xs sm:text-sm text-zinc-400 mr-2">{analyticsData?.failedCalls}</span>
-                  <span className="text-xs text-zinc-500">({(100 - (analyticsData?.successRate || 0)).toFixed(1)}%)</span>
-                </div>
-              </div>
+              )}
+            </div>
+            <div className="mt-4 pt-4 border-t border-zinc-800">
+              <p className="text-xs text-zinc-500">
+                Success rate: {analyticsData?.successRate.toFixed(1)}%
+              </p>
             </div>
           </Card>
         </div>
@@ -558,10 +587,6 @@ const AnalyticsPage: React.FC = () => {
                   </Button>
                 </>
               )}
-              <Button variant="outline" size="sm" className="text-xs sm:text-sm px-3 py-2">
-                <Eye className="w-4 h-4 mr-2" />
-                View All
-              </Button>
             </div>
           </div>
           
@@ -611,7 +636,6 @@ const AnalyticsPage: React.FC = () => {
                         <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Customer</th>
                         <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Status</th>
                         <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Duration</th>
-                        <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Questions</th>
                         <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Date</th>
                         <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Actions</th>
                       </tr>
@@ -645,9 +669,6 @@ const AnalyticsPage: React.FC = () => {
                           </td>
                           <td className="py-3 px-2">
                             <span className="text-xs sm:text-sm text-white">{formatDuration(call.duration)}</span>
-                          </td>
-                          <td className="py-3 px-2">
-                            <span className="text-xs sm:text-sm text-white">{call.questionsAnswered}/{call.totalQuestions}</span>
                           </td>
                           <td className="py-3 px-2">
                             <span className="text-xs text-zinc-400">{formatDate(call.createdAt)}</span>
