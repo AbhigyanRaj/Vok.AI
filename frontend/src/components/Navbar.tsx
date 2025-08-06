@@ -3,11 +3,14 @@ import { useAuth } from "../contexts/AuthContext";
 import { LogOut, Menu, User, X, Home, Layers, BarChart3, Settings, Coins, Plus } from "lucide-react";
 import * as auth from "../lib/auth";
 import { Link, useLocation } from "react-router-dom";
+import Modal from "./ui/modal";
+import { Button } from "./ui/button";
 
 const Navbar: React.FC = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, signIn, loading } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [userTokens, setUserTokens] = useState<number | null>(null);
+  const [authModal, setAuthModal] = useState<null | 'signup' | 'login'>(null);
   const location = useLocation();
 
   React.useEffect(() => {
@@ -25,6 +28,15 @@ const Navbar: React.FC = () => {
       await signOut();
     } catch (error) {
       console.error("Sign out error:", error);
+    }
+  };
+
+  const handleSignIn = async () => {
+    try {
+      await signIn();
+      setAuthModal(null);
+    } catch (error) {
+      console.error('Sign in failed:', error);
     }
   };
 
@@ -106,18 +118,18 @@ const Navbar: React.FC = () => {
               ) : (
                 /* Login/Signup Buttons */
                 <div className="flex items-center space-x-2">
-                  <Link
-                    to="/"
+                  <Button
+                    onClick={() => setAuthModal('signup')}
                     className="text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
                   >
                     Sign Up
-                  </Link>
-                  <Link
-                    to="/"
+                  </Button>
+                  <Button
+                    onClick={() => setAuthModal('login')}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
                   >
                     Log In
-                  </Link>
+                  </Button>
                 </div>
               )}
             </div>
@@ -198,25 +210,56 @@ const Navbar: React.FC = () => {
             ) : (
               /* Mobile Auth Buttons */
               <div className="space-y-2">
-                <Link
-                  to="/"
+                <Button
+                  onClick={() => {
+                    setAuthModal('signup');
+                    setIsMenuOpen(false);
+                  }}
                   className="text-zinc-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
                 >
                   Sign Up
-                </Link>
-                <Link
-                  to="/"
+                </Button>
+                <Button
+                  onClick={() => {
+                    setAuthModal('login');
+                    setIsMenuOpen(false);
+                  }}
                   className="bg-blue-600 hover:bg-blue-700 text-white block px-3 py-2 rounded-md text-base font-medium transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
                 >
                   Log In
-                </Link>
+                </Button>
               </div>
             )}
           </div>
         </div>
       )}
+
+        {/* Auth Modal */}
+        <Modal open={!!authModal} onClose={() => setAuthModal(null)}>
+          <div className="w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-white mb-4 text-center">{authModal === 'signup' ? 'Sign Up' : 'Log In'}</h2>
+            <div className="space-y-4">
+              <Button
+                className="w-full justify-center bg-white text-black hover:bg-gray-100 border border-white/20 font-semibold py-3 sm:py-4 text-sm sm:text-base"
+                onClick={handleSignIn}
+                disabled={loading}
+              >
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" viewBox="0 0 48 48">
+                  <g>
+                    <path fill="#4285F4" d="M24 9.5c3.54 0 6.7 1.22 9.19 3.23l6.85-6.85C35.64 2.39 30.18 0 24 0 14.82 0 6.73 5.48 2.69 13.44l7.98 6.2C12.13 13.09 17.62 9.5 24 9.5z"/>
+                    <path fill="#34A853" d="M46.1 24.55c0-1.64-.15-3.22-.42-4.74H24v9.01h12.42c-.54 2.9-2.18 5.36-4.65 7.03l7.19 5.6C43.98 37.13 46.1 31.34 46.1 24.55z"/>
+                    <path fill="#FBBC05" d="M10.67 28.09c-1.01-2.99-1.01-6.19 0-9.18l-7.98-6.2C.99 16.36 0 20.05 0 24c0 3.95.99 7.64 2.69 11.29l7.98-6.2z"/>
+                    <path fill="#EA4335" d="M24 48c6.18 0 11.36-2.05 15.15-5.59l-7.19-5.6c-2.01 1.35-4.59 2.15-7.96 2.15-6.38 0-11.87-3.59-14.33-8.79l-7.98 6.2C6.73 42.52 14.82 48 24 48z"/>
+                  </g>
+                </svg>
+                {loading ? 'Signing in...' : 'Continue with Google'}
+              </Button>
+              <p className="text-xs sm:text-sm md:text-base text-zinc-400 text-center">
+                By continuing, you agree to our Terms of Service and Privacy Policy
+              </p>
+            </div>
+          </div>
+        </Modal>
     </nav>
   );
 };
