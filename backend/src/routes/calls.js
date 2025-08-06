@@ -122,12 +122,9 @@ router.post('/initiate', protect, async (req, res) => {
         timeout: 120, // 2 minutes max call duration
         // Add recording for debugging
         record: false,
-        // Add machine detection
+        // Add machine detection with valid parameters only
         machineDetection: 'DetectMessageEnd',
-        machineDetectionTimeout: 30,
-        machineDetectionSpeechEndThreshold: 1000,
-        machineDetectionSpeechThreshold: 300,
-        machineDetectionSilenceTimeout: 10000
+        machineDetectionTimeout: 30
       });
     } else {
       // Fallback to simple TwiML for local development
@@ -438,9 +435,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           timeout: 15,
           method: 'POST',
           // Add speech recognition settings for better accuracy
-          speechTimeout: 'auto',
-          speechModel: 'phone_call',
-          enhanced: true
+          speechTimeout: 'auto'
         });
         gather.say(questions[questionIndex].question, { voice: 'Polly.Aditi' });
         console.log(`Asked question ${questionIndex}: ${questions[questionIndex].question}`);
