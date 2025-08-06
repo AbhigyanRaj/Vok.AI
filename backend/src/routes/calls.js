@@ -117,7 +117,17 @@ router.post('/initiate', protect, async (req, res) => {
         from: process.env.TWILIO_PHONE_NUMBER,
         statusCallback: statusCallbackUrl.toString(),
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-        statusCallbackMethod: 'POST'
+        statusCallbackMethod: 'POST',
+        // Add timeout to prevent hanging calls
+        timeout: 120, // 2 minutes max call duration
+        // Add recording for debugging
+        record: false,
+        // Add machine detection
+        machineDetection: 'DetectMessageEnd',
+        machineDetectionTimeout: 30,
+        machineDetectionSpeechEndThreshold: 1000,
+        machineDetectionSpeechThreshold: 300,
+        machineDetectionSilenceTimeout: 10000
       });
     } else {
       // Fallback to simple TwiML for local development
@@ -153,7 +163,8 @@ router.post('/initiate', protect, async (req, res) => {
         from: process.env.TWILIO_PHONE_NUMBER,
         statusCallback: statusCallbackUrl.toString(),
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed', 'failed', 'busy', 'no-answer', 'canceled'],
-        statusCallbackMethod: 'POST'
+        statusCallbackMethod: 'POST',
+        timeout: 120
       });
     }
 
@@ -193,11 +204,10 @@ router.post('/initiate', protect, async (req, res) => {
       duration: 0, // Will be updated when call completes
     });
 
-    // Store initial conversation
+    // Store initial conversation with proper formatting
     if (module.questions && module.questions.length > 0) {
-      const transcription = module.questions.map((question, index) => 
-        `VokAI: Question ${index + 1}: ${question.question}\nUser: [Call in progress - responses will be collected]\n`
-      ).join('');
+      const questions = module.questions.sort((a, b) => a.order - b.order);
+      const transcription = `VokAI: Hi ${customerName.trim()}, we are from VokAI. Is it the right time to speak to you about our questions?\n`;
       callRecord.transcription = transcription;
     }
 
@@ -303,13 +313,13 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       const gather = twimlResponse.gather({
         input: 'speech',
         action: nextUrl.toString(),
-        timeout: 5,
+        timeout: 8,
         method: 'POST'
       });
 
     } else if (step === 1) {
       // Check if customer confirmed availability
-      if (previousResponse && ['yes', 'okay', 'sure', 'go ahead', 'yeah'].some(word => 
+      if (previousResponse && ['yes', 'okay', 'sure', 'go ahead', 'yeah', 'hmm', 'uh huh'].some(word => 
         previousResponse.toLowerCase().includes(word))) {
         
         console.log('\n✅ CUSTOMER CONFIRMED AVAILABILITY!');
@@ -319,7 +329,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           `Great! Let me ask you a few questions.`,
           { voice: 'Polly.Aditi' }
         );
-        twimlResponse.pause({ length: 1 });
+        twimlResponse.pause({ length: 0.5 });
 
         const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
         nextUrl.searchParams.set('moduleId', moduleId);
@@ -330,7 +340,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         const gather = twimlResponse.gather({
           input: 'speech',
           action: nextUrl.toString(),
-          timeout: 10,
+          timeout: 15,
           method: 'POST'
         });
         gather.say(questions[0].question, { voice: 'Polly.Aditi' });
@@ -366,15 +376,30 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         call.currentStep = step;
         call.status = 'in-progress';
         
-        // Store conversation in transcription field
-        const conversation = call.transcription ? call.transcription + '\n' : '';
-        const newConversation = conversation + `VokAI: ${questions[questionIndex - 1]?.question || 'Question'}\nUser: ${previousResponse}\n`;
-        call.transcription = newConversation;
+        // Store conversation in transcription field with proper formatting
+        let conversation = call.transcription || '';
+        
+        // If this is the first response, initialize the conversation
+        if (conversation === '') {
+          conversation = `VokAI: Hi ${customerName}, we are from VokAI. Is it the right time to speak to you about our questions?\n`;
+          if (previousResponse) {
+            conversation += `User: ${previousResponse}\n`;
+            conversation += `VokAI: Great! Let me ask you a few questions.\n`;
+          }
+        }
+        
+        // Add the current question and response
+        if (questionIndex >= 0 && questionIndex < questions.length) {
+          conversation += `VokAI: Question ${questionIndex + 1}: ${questions[questionIndex].question}\n`;
+          conversation += `User: ${previousResponse}\n`;
+        }
+        
+        call.transcription = conversation;
         
         await call.save();
 
         console.log('✅ Response stored in database');
-        console.log('✅ Conversation updated:', newConversation);
+        console.log('✅ Conversation updated:', conversation);
       }
 
       // Check if we've reached the end of questions
@@ -385,7 +410,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           'Thank you for providing the information. We have recorded all your responses.',
           { voice: 'Polly.Aditi' }
         );
-        twimlResponse.pause({ length: 1 });
+        twimlResponse.pause({ length: 0.5 });
         twimlResponse.say(
           'Our team will review your responses. Have a great day!',
           { voice: 'Polly.Aditi' }
@@ -400,7 +425,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         }
 
       } else {
-        // Ask next question
+        // Ask next question with optimized flow
         const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
         nextUrl.searchParams.set('moduleId', moduleId);
         nextUrl.searchParams.set('customerName', customerName);
@@ -410,8 +435,12 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         const gather = twimlResponse.gather({
           input: 'speech',
           action: nextUrl.toString(),
-          timeout: 10,
-          method: 'POST'
+          timeout: 15,
+          method: 'POST',
+          // Add speech recognition settings for better accuracy
+          speechTimeout: 'auto',
+          speechModel: 'phone_call',
+          enhanced: true
         });
         gather.say(questions[questionIndex].question, { voice: 'Polly.Aditi' });
         console.log(`Asked question ${questionIndex}: ${questions[questionIndex].question}`);
@@ -452,28 +481,30 @@ router.post('/status', validateTwilioRequest, async (req, res) => {
       call.status = CallStatus;
       if (CallDuration) call.duration = parseInt(CallDuration);
       
-      // Update transcription based on call status
-      if (['failed', 'busy', 'no-answer', 'canceled'].includes(CallStatus)) {
-        // Call was cut off or failed
-        call.transcription = call.transcription.replace(
-          /User: \[Call in progress - responses will be collected\]/g,
-          'User: [Call was cut off - no response collected]'
-        );
-        console.log('❌ Call was cut off or failed');
-      } else if (CallStatus === 'completed' && call.duration < 30) {
-        // Call completed but was too short (likely cut off)
-        call.transcription = call.transcription.replace(
-          /User: \[Call in progress - responses will be collected\]/g,
-          'User: [Call ended too quickly - likely cut off]'
-        );
-        console.log('⚠️ Call completed but was too short');
-      } else if (CallStatus === 'completed') {
-        // Call completed successfully
-        call.transcription = call.transcription.replace(
-          /User: \[Call in progress - responses will be collected\]/g,
-          'User: [Call completed successfully]'
-        );
-        console.log('✅ Call completed successfully');
+      // Only update transcription if it's empty or contains placeholder text
+      if (!call.transcription || call.transcription.includes('[Call in progress')) {
+        if (['failed', 'busy', 'no-answer', 'canceled'].includes(CallStatus)) {
+          // Call was cut off or failed
+          call.transcription = call.transcription ? call.transcription.replace(
+            /User: \[Call in progress - responses will be collected\]/g,
+            'User: [Call was cut off - no response collected]'
+          ) : 'VokAI: Call was cut off or failed\nUser: [No response collected]';
+          console.log('❌ Call was cut off or failed');
+        } else if (CallStatus === 'completed' && call.duration < 30) {
+          // Call completed but was too short (likely cut off)
+          call.transcription = call.transcription ? call.transcription.replace(
+            /User: \[Call in progress - responses will be collected\]/g,
+            'User: [Call ended too quickly - likely cut off]'
+          ) : 'VokAI: Call ended too quickly\nUser: [Call ended too quickly - likely cut off]';
+          console.log('⚠️ Call completed but was too short');
+        } else if (CallStatus === 'completed') {
+          // Call completed successfully
+          call.transcription = call.transcription ? call.transcription.replace(
+            /User: \[Call in progress - responses will be collected\]/g,
+            'User: [Call completed successfully]'
+          ) : 'VokAI: Call completed successfully\nUser: [Call completed successfully]';
+          console.log('✅ Call completed successfully');
+        }
       }
       
       await call.save();
