@@ -93,7 +93,7 @@ const Hero: React.FC = () => {
   const renderModuleSelection = () => (
     <div className="space-y-4 w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto">
       <div className="text-center mb-4 sm:mb-6">
-        <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-white mb-2">Choose a Voice Module</h3>
+        <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white mb-2">Choose a Voice Module</h3>
         <p className="text-xs sm:text-sm md:text-base text-zinc-300">Select a module to use for your calls</p>
       </div>
       
@@ -105,13 +105,13 @@ const Hero: React.FC = () => {
       ) : userModules.length === 0 ? (
         <div className="text-center py-6 sm:py-8">
           <Layers className="w-10 h-10 sm:w-12 sm:h-12 text-zinc-400 mx-auto mb-3" />
-          <p className="text-sm sm:text-base md:text-lg text-zinc-300 mb-4">No modules found</p>
+          <p className="text-xs sm:text-sm md:text-base text-zinc-300 mb-4">No modules found</p>
           <Button 
             onClick={() => {
               setModalOpen(false);
               setCreateModuleOpen(true);
             }}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base md:text-lg px-4 py-2"
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm md:text-base px-4 py-2"
           >
             Create Your First Module
           </Button>
@@ -130,7 +130,7 @@ const Hero: React.FC = () => {
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-white font-medium text-sm sm:text-base md:text-lg truncate">{module.name}</h4>
+                  <h4 className="text-white font-medium text-xs sm:text-sm md:text-base truncate">{module.name}</h4>
                   <p className="text-xs sm:text-sm md:text-base text-zinc-400 mt-1">
                     {module.questions?.length || 0} questions
                   </p>
@@ -147,7 +147,7 @@ const Hero: React.FC = () => {
       {selectedModule && (
         <Button
           onClick={handleProceedWithModule}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base md:text-lg py-2.5 sm:py-3 md:py-4"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm md:text-base py-2.5 sm:py-3 md:py-4"
         >
           Continue with "{selectedModule.name}"
         </Button>
@@ -158,7 +158,7 @@ const Hero: React.FC = () => {
   const renderContactUpload = () => (
     <div className="space-y-4 w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto">
       <div className="text-center mb-4 sm:mb-6">
-        <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-white mb-2">Upload Contacts</h3>
+        <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white mb-2">Upload Contacts</h3>
         <p className="text-xs sm:text-sm md:text-base text-zinc-300">
           Selected module: <span className="text-blue-400 break-words">{selectedModule?.name}</span>
         </p>
@@ -194,31 +194,31 @@ const Hero: React.FC = () => {
         <div className="relative z-10 max-w-4xl mx-auto w-full">
           <Badge 
             variant="outline" 
-            className="mb-4 sm:mb-6 border-white/10 text-white/70 bg-white/5 backdrop-blur-sm text-xs sm:text-sm px-3 py-1"
+            className="mb-4 sm:mb-6 border-white/10 text-white/70 bg-white/5 backdrop-blur-sm text-xs px-3 py-1"
           >
             <Zap className="w-3 h-3 mr-1" />
             AI Voice Automation Platform
           </Badge>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold mb-3 sm:mb-4 tracking-tight md:tracking-tighter text-white font-[Sora] select-none px-2">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold mb-3 sm:mb-4 tracking-tight md:tracking-tighter text-white font-[Sora] select-none px-2">
             <span className="font-extrabold tracking-[-0.04em] drop-shadow-sm" style={{fontFamily: 'Sora, sans-serif'}}>Vok</span>
             <span className="font-medium tracking-[-0.04em] drop-shadow-sm" style={{fontFamily: 'Sora, sans-serif'}}>.ai</span>
           </h1>
-          <p className="text-sm sm:text-base md:text-lg mb-6 sm:mb-8 md:mb-10 max-w-2xl mx-auto font-light text-white/70 leading-relaxed px-4">
+          <p className="text-xs sm:text-sm md:text-base mb-6 sm:mb-8 md:mb-10 max-w-2xl mx-auto font-light text-white/70 leading-relaxed px-4">
             Automate voice calls, collect answers, and get instant insights.
           </p>
           {/* Auth or Create Module Button */}
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-6 sm:mb-8 md:mb-10 px-4">
             {!user ? (
               <>
-                <Button variant="outline" className="text-black border-white/20 bg-white hover:bg-gray-100 font-semibold text-sm sm:text-base py-2.5 sm:py-3" onClick={() => setAuthModal('signup')}>
+                <Button variant="outline" className="text-black border-white/20 bg-white hover:bg-gray-100 font-semibold text-xs sm:text-sm py-2.5 sm:py-3" onClick={() => setAuthModal('signup')}>
                   <UserPlus className="w-4 h-4 mr-2" /> Sign Up
                 </Button>
-                <Button variant="outline" className="text-black border-white/20 bg-white hover:bg-gray-100 font-semibold text-sm sm:text-base py-2.5 sm:py-3" onClick={() => setAuthModal('login')}>
+                <Button variant="outline" className="text-black border-white/20 bg-white hover:bg-gray-100 font-semibold text-xs sm:text-sm py-2.5 sm:py-3" onClick={() => setAuthModal('login')}>
                   <LogIn className="w-4 h-4 mr-2" /> Log In
                 </Button>
               </>
             ) : (
-              <Button variant="outline" className="text-black border-white/20 bg-white hover:bg-gray-100 font-semibold text-sm sm:text-base py-2.5 sm:py-3" onClick={() => setCreateModuleOpen(true)}>
+              <Button variant="outline" className="text-black border-white/20 bg-white hover:bg-gray-100 font-semibold text-xs sm:text-sm py-2.5 sm:py-3" onClick={() => setCreateModuleOpen(true)}>
                 <Layers className="w-4 h-4 mr-2" /> Create Module
               </Button>
             )}
@@ -234,10 +234,10 @@ const Hero: React.FC = () => {
                   <div className={`flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 rounded-full ${f.bg} mb-4 sm:mb-5 group-hover:scale-105 transition-transform`}>
                     {f.icon}
                   </div>
-                  <div className="text-sm sm:text-base lg:text-lg font-medium text-white mb-2 text-center tracking-tight">
+                  <div className="text-xs sm:text-sm lg:text-base font-medium text-white mb-2 text-center tracking-tight">
                     {f.title}
                   </div>
-                  <div className="text-xs sm:text-sm text-white/60 text-center font-light max-w-[180px] sm:max-w-[200px] lg:max-w-[220px]">
+                  <div className="text-xs text-white/60 text-center font-light max-w-[180px] sm:max-w-[200px] lg:max-w-[220px]">
                     {f.desc}
                   </div>
                 </div>
@@ -245,20 +245,20 @@ const Hero: React.FC = () => {
             </div>
           </div>
           {/* CTA Button */}
-          <Button
-            size="lg"
-            className="rounded-xl px-6 sm:px-8 lg:px-10 py-3 sm:py-4 lg:py-5 text-sm sm:text-base lg:text-lg font-semibold border border-white/10 bg-white text-black hover:bg-gray-100 hover:scale-105 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-black/10 focus-visible:ring-offset-2 focus-visible:ring-offset-white shadow-none"
-            onClick={() => setModalOpen(true)}
-          >
-            Get Started <ArrowRightIcon />
-          </Button>
+                      <Button
+              size="lg"
+              className="rounded-xl px-6 sm:px-8 lg:px-10 py-3 sm:py-4 lg:py-5 text-xs sm:text-xs lg:text-sm font-semibold border border-white/10 bg-white text-black hover:bg-gray-100 hover:scale-105 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-black/10 focus-visible:ring-offset-2 focus-visible:ring-offset-white shadow-none"
+              onClick={() => setModalOpen(true)}
+            >
+              Get Started <ArrowRightIcon />
+            </Button>
           {/* Modal for Get Started */}
           <Modal open={modalOpen} onClose={handleModalClose}>
             <div className="w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto">
               {!user ? (
                 <>
-                  <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-white mb-2 text-center">Get Started</h2>
-                  <p className="text-xs sm:text-sm md:text-base text-zinc-300 mb-4 sm:mb-6 text-center">Enter your details and we'll reach out soon.</p>
+                  <h2 className="text-sm sm:text-base md:text-lg font-semibold text-white mb-2 text-center">Get Started</h2>
+                  <p className="text-xs text-zinc-300 mb-4 sm:mb-6 text-center">Enter your details and we'll reach out soon.</p>
                   <ContactUploader
                     onSubmit={contacts => {
                       console.log("Submitted contacts:", contacts);
@@ -277,10 +277,10 @@ const Hero: React.FC = () => {
           {/* Auth Modal */}
           <Modal open={!!authModal} onClose={() => setAuthModal(null)}>
             <div className="w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto">
-              <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-white mb-4 text-center">{authModal === 'signup' ? 'Sign Up' : 'Log In'}</h2>
+              <h2 className="text-sm sm:text-base md:text-lg font-semibold text-white mb-4 text-center">{authModal === 'signup' ? 'Sign Up' : 'Log In'}</h2>
               <div className="space-y-4">
                 <Button
-                  className="w-full justify-center bg-white text-black hover:bg-gray-100 border border-white/20 font-semibold py-3 sm:py-4 text-sm sm:text-base"
+                  className="w-full justify-center bg-white text-black hover:bg-gray-100 border border-white/20 font-semibold py-3 sm:py-4 text-xs sm:text-xs md:text-sm"
                   onClick={handleSignIn}
                   disabled={loading}
                 >
@@ -294,7 +294,7 @@ const Hero: React.FC = () => {
                   </svg>
                   {loading ? 'Signing in...' : 'Continue with Google'}
                 </Button>
-                <p className="text-xs sm:text-sm md:text-base text-zinc-400 text-center">
+                <p className="text-xs text-zinc-400 text-center">
                   By continuing, you agree to our Terms of Service and Privacy Policy
                 </p>
               </div>
@@ -305,7 +305,7 @@ const Hero: React.FC = () => {
           
           {/* Development Status */}
           <div className="mt-6 sm:mt-8 md:mt-10 mb-6 sm:mb-8 md:mb-10 flex items-center justify-center px-4">
-            <div className="text-xs sm:text-sm md:text-base text-white/40 bg-white/5 backdrop-blur-sm px-3 sm:px-4 py-2 rounded-full border border-white/10 text-center">
+            <div className="text-xs text-white/40 bg-white/5 backdrop-blur-sm px-3 sm:px-4 py-2 rounded-full border border-white/10 text-center">
               <span className="mr-2">Under Development</span>
               <span className="text-white/30">•</span>
               <span className="ml-2">Built by Abhigyan | IIIT Delhi</span>
