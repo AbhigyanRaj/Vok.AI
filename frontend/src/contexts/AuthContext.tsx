@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import type { User } from 'firebase/auth';
-import { onAuthStateChange, signInWithGoogle, signOutUser, getUserProfile, createUserProfile } from '../lib/firebase';
+import { useGoogleLogin } from '@react-oauth/google';
+import * as auth from '../lib/auth';
 
 interface AuthContextType {
-  user: User | null;
+  user: auth.User | null;
   loading: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -24,11 +24,15 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<auth.User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  console.log('AuthProvider rendered with user:', user, 'loading:', loading);
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChange((user) => {
+    console.log('AuthProvider useEffect - setting up auth state change listener');
+    const unsubscribe = auth.onAuthStateChange((user) => {
+      console.log('Auth state changed:', user);
       setUser(user);
       setLoading(false);
     });
@@ -36,15 +40,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (response) => {
+      try {
+        // Get user info from Google
+        const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${response.access_token}` },
+        }).then(res => res.json());
+
+        // Authenticate with our backend
+        const authResponse = await auth.signInWithGoogle(userInfo);
+        if (authResponse.success) {
+          setUser(authResponse.user);
+        }
+      } catch (error) {
+        console.error('Google login error:', error);
+        throw error;
+      }
+    },
+    onError: (error) => {
+      console.error('Google login error:', error);
+    }
+  });
+
   const signIn = async () => {
     try {
-      const user = await signInWithGoogle();
-      if (user) {
-        const profile = await getUserProfile(user.uid);
-        if (!profile) {
-          await createUserProfile(user.uid);
-        }
-      }
+      await googleLogin();
     } catch (error) {
       console.error('Sign in error:', error);
       throw error;
@@ -53,7 +74,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = async () => {
     try {
-      await signOutUser();
+      await auth.signOutUser();
+      setUser(null);
     } catch (error) {
       console.error('Sign out error:', error);
       throw error;

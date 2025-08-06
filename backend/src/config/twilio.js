@@ -1,38 +1,137 @@
 import twilio from 'twilio';
 
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+// Lazy initialization of Twilio client
+let client = null;
+let requestValidator = null;
 
-export const makeCall = async (to, from, twimlUrl) => {
+const getTwilioClient = () => {
+  if (!client) {
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    
+    if (!accountSid || !authToken) {
+      throw new Error('Twilio credentials not found. Please check TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in your .env file');
+    }
+    
+    client = twilio(accountSid, authToken);
+    requestValidator = new twilio.RequestValidator(authToken);
+  }
+  return client;
+};
+
+const getRequestValidator = () => {
+  if (!requestValidator) {
+    getTwilioClient(); // This will initialize both
+  }
+  return requestValidator;
+};
+
+/**
+ * Validate Twilio webhook request
+ * Based on the reference Python implementation
+ */
+export const validateTwilioRequest = (req, res, next) => {
   try {
-    const call = await client.calls.create({
+    // Get the request URL and authentication token
+    const twilioSignature = req.headers['x-twilio-signature'] || '';
+    
+    // Get the full URL from the request
+    let url = req.protocol + '://' + req.get('host') + req.originalUrl;
+    
+    // For ngrok URLs, we need to ensure we're using https and the correct host
+    if (req.get('host') && req.get('host').includes('ngrok')) {
+      const forwardedProto = req.headers['x-forwarded-proto'] || 'https';
+      const forwardedHost = req.headers['x-forwarded-host'] || req.get('host');
+      
+      if (forwardedHost) {
+        url = `${forwardedProto}://${forwardedHost}${req.path}`;
+        if (req.query && Object.keys(req.query).length > 0) {
+          const queryString = new URLSearchParams(req.query).toString();
+          url = `${url}?${queryString}`;
+        }
+      }
+    }
+    
+    // Get POST data
+    const postData = req.method === 'POST' ? req.body : {};
+    
+    console.log('\n=== Twilio Request Validation ===');
+    console.log('Twilio Signature:', twilioSignature);
+    console.log('Request URL:', url);
+    console.log('Post Data:', postData);
+    console.log('Headers:', req.headers);
+    console.log('Method:', req.method);
+    
+    // Skip validation in development/testing
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'testing') {
+      console.log('Skipping validation - development mode');
+      return next();
+    }
+    
+    // Validate the request
+    const validator = getRequestValidator();
+    const isValid = validator.validate(url, postData, twilioSignature);
+    
+    console.log('Request validation result:', isValid ? 'Valid' : 'Invalid');
+    
+    if (isValid) {
+      return next();
+    }
+    
+    console.log('WARNING: Invalid Twilio request signature');
+    return res.status(403).send('Invalid twilio request signature');
+    
+  } catch (error) {
+    console.error('Error validating Twilio request:', error);
+    return res.status(500).send('Error validating request');
+  }
+};
+
+/**
+ * Make an outbound call using Twilio
+ */
+export const makeCall = async (to, from, webhookUrl, statusCallbackUrl = null) => {
+  try {
+    console.log('\n=== Making Twilio Call ===');
+    console.log('To:', to);
+    console.log('From:', from);
+    console.log('Webhook URL:', webhookUrl);
+    
+    const twilioClient = getTwilioClient();
+    
+    const callOptions = {
+      method: 'POST',
+      url: webhookUrl,
       to: to,
       from: from,
-      url: twimlUrl,
-      record: true,
-    });
+    };
+    
+    // Add status callback if provided
+    if (statusCallbackUrl) {
+      callOptions.statusCallback = statusCallbackUrl;
+      callOptions.statusCallbackEvent = ['initiated', 'ringing', 'answered', 'completed'];
+      callOptions.statusCallbackMethod = 'POST';
+    }
+    
+    const call = await twilioClient.calls.create(callOptions);
+    
+    console.log('\n=== Call Initiated ===');
+    console.log('Call SID:', call.sid);
+    console.log('Status:', call.status);
+    
     return call;
   } catch (error) {
-    console.error('Twilio call error:', error);
+    console.error('Error making Twilio call:', error);
     throw error;
   }
 };
 
-export const generateTwiML = (questions) => {
-  let twiml = '<?xml version="1.0" encoding="UTF-8"?><Response>';
-  
-  questions.forEach((question, index) => {
-    twiml += `<Say voice="alice">${question}</Say>`;
-    twiml += '<Pause length="3"/>';
-    if (index < questions.length - 1) {
-      twiml += '<Pause length="2"/>';
-    }
-  });
-  
-  twiml += '</Response>';
-  return twiml;
+/**
+ * Create TwiML response for voice interactions
+ */
+export const createTwiMLResponse = () => {
+  return new twilio.twiml.VoiceResponse();
 };
 
-export default client; 
+export { getTwilioClient as twilioClient };
+export default getTwilioClient;

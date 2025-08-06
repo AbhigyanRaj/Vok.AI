@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { Button } from "./ui/button";
-import { X, GripVertical } from "lucide-react";
-import { addVoiceModule } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
+import * as auth from "../lib/auth";
+import { Button } from "./ui/button";
+import { Plus, X, Loader2 } from "lucide-react";
+import Modal from "./ui/modal";
 
 interface CreateModuleProps {
   open: boolean;
@@ -10,107 +11,164 @@ interface CreateModuleProps {
 }
 
 const CreateModule: React.FC<CreateModuleProps> = ({ open, onClose }) => {
-  const [companyName, setCompanyName] = useState("");
-  const [questions, setQuestions] = useState<string[]>([""]);
-  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
-  const [moduleSuccess, setModuleSuccess] = useState(false);
-  const [error, setError] = useState("");
   const { user } = useAuth();
+  const [moduleName, setModuleName] = useState("");
+  const [questions, setQuestions] = useState<string[]>([""]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const handleQuestionChange = (idx: number, value: string) => {
-    setQuestions(qs => qs.map((q, i) => (i === idx ? value : q)));
+  const addQuestion = () => {
+    setQuestions([...questions, ""]);
   };
-  const addQuestion = () => setQuestions(qs => [...qs, ""]);
-  const removeQuestion = (idx: number) => setQuestions(qs => qs.length > 1 ? qs.filter((_, i) => i !== idx) : qs);
 
-  // Drag and drop handlers
-  const handleDragStart = (idx: number) => setDraggedIdx(idx);
-  const handleDragOver = (idx: number) => {
-    if (draggedIdx === null || draggedIdx === idx) return;
-    setQuestions(qs => {
-      const arr = [...qs];
-      const [removed] = arr.splice(draggedIdx, 1);
-      arr.splice(idx, 0, removed);
-      return arr;
-    });
-    setDraggedIdx(idx);
+  const removeQuestion = (index: number) => {
+    if (questions.length > 1) {
+      setQuestions(questions.filter((_, i) => i !== index));
+    }
   };
-  const handleDragEnd = () => setDraggedIdx(null);
 
-  const handleModuleSubmit = async (e: React.FormEvent) => {
+  const updateQuestion = (index: number, value: string) => {
+    const updated = [...questions];
+    updated[index] = value;
+    setQuestions(updated);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    
     if (!user) {
-      setError("You must be logged in to create a module.");
+      setError("Please sign in to create a module");
       return;
     }
+
+    if (!moduleName.trim()) {
+      setError("Module name is required");
+      return;
+    }
+
+    const validQuestions = questions.filter(q => q.trim());
+    if (validQuestions.length === 0) {
+      setError("At least one question is required");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
     try {
-      await addVoiceModule(user.uid, companyName, questions);
-      setModuleSuccess(true);
-      setTimeout(() => setModuleSuccess(false), 2000);
-      setCompanyName("");
+      await auth.addVoiceModule(user._id, moduleName.trim(), validQuestions);
+      setSuccess("Module created successfully!");
+      setModuleName("");
       setQuestions([""]);
-      onClose();
-    } catch (err) {
+      
+      setTimeout(() => {
+        setSuccess("");
+        onClose();
+      }, 2000);
+    } catch (error) {
       setError("Failed to create module. Please try again.");
+      console.error("Error creating module:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative bg-zinc-900 rounded-2xl shadow-xl w-full max-w-sm sm:max-w-md mx-2 sm:mx-4 p-4 sm:p-6 animate-fade-in border border-white/10">
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-zinc-400 hover:text-white focus:outline-none"
-          aria-label="Close"
-        >
-          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
-        <h2 className="text-base sm:text-lg font-semibold text-white mb-4 text-center">Create Module</h2>
-        <form onSubmit={handleModuleSubmit} className="flex flex-col gap-3 sm:gap-4">
-          <input
-            type="text"
-            placeholder="Company Name"
-            value={companyName}
-            onChange={e => setCompanyName(e.target.value)}
-            required
-            className="rounded-lg border border-zinc-700 px-3 sm:px-4 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/20 bg-zinc-800 text-white placeholder-zinc-400 w-full"
-          />
-          <div className="flex flex-col gap-2">
-            {questions.map((q, idx) => (
-              <div
-                key={idx}
-                className="flex gap-2 items-center w-full"
-                draggable
-                onDragStart={() => handleDragStart(idx)}
-                onDragOver={e => { e.preventDefault(); handleDragOver(idx); }}
-                onDragEnd={handleDragEnd}
-                style={{ opacity: draggedIdx === idx ? 0.5 : 1, cursor: "grab" }}
-              >
-                <span className="p-1 text-zinc-400 cursor-grab"><GripVertical className="w-4 h-4" /></span>
-                <input
-                  type="text"
-                  placeholder={`Question ${idx + 1}`}
-                  value={q}
-                  onChange={e => handleQuestionChange(idx, e.target.value)}
-                  required
-                  className="flex-1 rounded-lg border border-zinc-700 px-3 sm:px-4 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/20 bg-zinc-800 text-white placeholder-zinc-400"
-                />
-                <Button type="button" variant="ghost" className="p-1" onClick={() => removeQuestion(idx)} disabled={questions.length === 1} title="Remove">
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            ))}
-            <Button type="button" variant="outline" className="mt-2 font-medium bg-white text-black hover:bg-gray-100 w-full sm:w-auto text-xs sm:text-base" onClick={addQuestion}>+ Add Question</Button>
+    <Modal open={open} onClose={onClose}>
+      <div className="w-full max-w-md mx-auto">
+        <div className="text-center mb-6">
+          <h2 className="text-xl font-semibold text-white mb-2">Create Voice Module</h2>
+          <p className="text-sm text-zinc-400">Build a voice module with custom questions for automated calls</p>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-900/30 border border-red-500/30 rounded-lg text-red-400 text-sm text-center">
+            {error}
           </div>
-          <Button type="submit" className="mt-2 rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors w-full sm:w-auto text-xs sm:text-base">Save Module</Button>
-          {error && <div className="text-red-400 text-xs text-center">{error}</div>}
-          {moduleSuccess && <div className="text-green-400 text-xs text-center">Module created!</div>}
+        )}
+
+        {success && (
+          <div className="mb-4 p-3 bg-green-900/30 border border-green-500/30 rounded-lg text-green-400 text-sm text-center">
+            {success}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Module Name */}
+          <div>
+            <label className="block text-sm font-medium text-white mb-2">
+              Module Name
+            </label>
+            <input
+              type="text"
+              value={moduleName}
+              onChange={(e) => setModuleName(e.target.value)}
+              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm"
+              placeholder="Enter module name..."
+              disabled={loading}
+            />
+          </div>
+
+          {/* Questions */}
+          <div>
+            <label className="block text-sm font-medium text-white mb-2">
+              Questions
+            </label>
+            <div className="space-y-2">
+              {questions.map((question, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={question}
+                    onChange={(e) => updateQuestion(index, e.target.value)}
+                    className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm"
+                    placeholder={`Question ${index + 1}...`}
+                    disabled={loading}
+                  />
+                  {questions.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeQuestion(index)}
+                      className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors"
+                      disabled={loading}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addQuestion}
+              className="mt-2 flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors text-sm"
+              disabled={loading}
+            >
+              <Plus className="w-4 h-4" />
+              Add Question
+            </button>
+          </div>
+
+          {/* Submit Button */}
+          <Button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition-colors"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Creating Module...
+              </>
+            ) : (
+              "Create Module"
+            )}
+          </Button>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 };
 

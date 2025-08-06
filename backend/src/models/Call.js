@@ -11,6 +11,10 @@ const callSchema = new mongoose.Schema({
     ref: 'Module',
     required: true,
   },
+  customerName: {
+    type: String,
+    required: true,
+  },
   phoneNumber: {
     type: String,
     required: true,
@@ -18,15 +22,21 @@ const callSchema = new mongoose.Schema({
   twilioCallSid: {
     type: String,
     required: true,
+    unique: true,
   },
   status: {
     type: String,
-    enum: ['initiated', 'ringing', 'in-progress', 'completed', 'failed'],
+    enum: ['initiated', 'ringing', 'in-progress', 'answered', 'completed', 'failed', 'busy', 'no-answer', 'canceled'],
     default: 'initiated',
   },
   duration: {
     type: Number,
     default: 0,
+  },
+  responses: {
+    type: Map,
+    of: String,
+    default: new Map(),
   },
   transcription: {
     type: String,
@@ -36,9 +46,27 @@ const callSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  evaluation: {
+    result: {
+      type: String,
+      enum: ['YES', 'NO', 'INVESTIGATION_REQUIRED'],
+      default: null,
+    },
+    comments: [{
+      type: String,
+    }],
+  },
   recordingUrl: {
     type: String,
     default: '',
+  },
+  currentStep: {
+    type: Number,
+    default: 0,
+  },
+  tokensUsed: {
+    type: Number,
+    default: 1,
   },
 }, {
   timestamps: true,

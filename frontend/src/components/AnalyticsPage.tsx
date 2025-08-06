@@ -1,12 +1,413 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { Card } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { 
+  BarChart3, 
+  PhoneCall, 
+  Users, 
+  TrendingUp, 
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  Calendar,
+  Download,
+  Filter,
+  RefreshCw,
+  Eye,
+  Mic,
+  MessageSquare,
+  Activity
+} from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import * as auth from "../lib/auth";
 
-const AnalyticsPage: React.FC = () => (
-  <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 px-2 sm:px-4 py-8 sm:py-10 pt-24">
-    <div className="w-full max-w-2xl mx-auto flex flex-col items-center mt-12 sm:mt-20">
-      <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2 text-center font-sans">Analytics</h1>
-      <p className="text-zinc-400 text-center mb-8 sm:mb-10 max-w-lg text-sm sm:text-base">View your call and module analytics here. (Coming soon!)</p>
+interface CallData {
+  id: string;
+  moduleName: string;
+  customerName: string;
+  phoneNumber: string;
+  status: 'completed' | 'failed' | 'in-progress';
+  duration: number;
+  questionsAnswered: number;
+  totalQuestions: number;
+  createdAt: string;
+  completedAt?: string;
+}
+
+interface AnalyticsData {
+  totalCalls: number;
+  completedCalls: number;
+  failedCalls: number;
+  averageDuration: number;
+  totalQuestions: number;
+  averageQuestionsAnswered: number;
+  successRate: number;
+  callsThisWeek: number;
+  callsThisMonth: number;
+  topModules: Array<{ name: string; calls: number }>;
+  recentCalls: CallData[];
+}
+
+const AnalyticsPage: React.FC = () => {
+  const { user } = useAuth();
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('month');
+  const [selectedModule, setSelectedModule] = useState<string>('all');
+
+  // Mock data for demonstration
+  const mockAnalyticsData: AnalyticsData = {
+    totalCalls: 156,
+    completedCalls: 142,
+    failedCalls: 14,
+    averageDuration: 4.2,
+    totalQuestions: 468,
+    averageQuestionsAnswered: 3.1,
+    successRate: 91.0,
+    callsThisWeek: 23,
+    callsThisMonth: 89,
+    topModules: [
+      { name: "VokAI-Module-01", calls: 45 },
+      { name: "module-2", calls: 32 },
+      { name: "Credit Card Survey", calls: 28 },
+      { name: "Loan Application", calls: 21 },
+      { name: "Customer Feedback", calls: 18 }
+    ],
+    recentCalls: [
+      {
+        id: "1",
+        moduleName: "VokAI-Module-01",
+        customerName: "John Smith",
+        phoneNumber: "+1-555-0123",
+        status: "completed",
+        duration: 5.2,
+        questionsAnswered: 3,
+        totalQuestions: 4,
+        createdAt: "2024-01-15T10:30:00Z",
+        completedAt: "2024-01-15T10:35:00Z"
+      },
+      {
+        id: "2",
+        moduleName: "module-2",
+        customerName: "Sarah Johnson",
+        phoneNumber: "+1-555-0124",
+        status: "completed",
+        duration: 3.8,
+        questionsAnswered: 2,
+        totalQuestions: 3,
+        createdAt: "2024-01-15T09:15:00Z",
+        completedAt: "2024-01-15T09:19:00Z"
+      },
+      {
+        id: "3",
+        moduleName: "Credit Card Survey",
+        customerName: "Mike Davis",
+        phoneNumber: "+1-555-0125",
+        status: "failed",
+        duration: 1.2,
+        questionsAnswered: 0,
+        totalQuestions: 5,
+        createdAt: "2024-01-15T08:45:00Z"
+      },
+      {
+        id: "4",
+        moduleName: "Loan Application",
+        customerName: "Emily Wilson",
+        phoneNumber: "+1-555-0126",
+        status: "completed",
+        duration: 6.1,
+        questionsAnswered: 4,
+        totalQuestions: 4,
+        createdAt: "2024-01-14T16:20:00Z",
+        completedAt: "2024-01-14T16:26:00Z"
+      },
+      {
+        id: "5",
+        moduleName: "Customer Feedback",
+        customerName: "David Brown",
+        phoneNumber: "+1-555-0127",
+        status: "in-progress",
+        duration: 2.5,
+        questionsAnswered: 1,
+        totalQuestions: 3,
+        createdAt: "2024-01-15T11:00:00Z"
+      }
+    ]
+  };
+
+  useEffect(() => {
+    // Simulate loading analytics data
+    const loadAnalytics = async () => {
+      setLoading(true);
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setAnalyticsData(mockAnalyticsData);
+      setLoading(false);
+    };
+
+    loadAnalytics();
+  }, [timeRange, selectedModule]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'failed': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'in-progress': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed': return <CheckCircle className="w-4 h-4" />;
+      case 'failed': return <XCircle className="w-4 h-4" />;
+      case 'in-progress': return <Clock className="w-4 h-4" />;
+      default: return <Activity className="w-4 h-4" />;
+    }
+  };
+
+  const formatDuration = (minutes: number) => {
+    const mins = Math.floor(minutes);
+    const secs = Math.round((minutes - mins) * 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 px-2 sm:px-4 py-8 sm:py-10 pt-24">
+        <div className="w-full max-w-6xl mx-auto">
+          <div className="flex items-center justify-center">
+            <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
+            <span className="ml-3 text-white text-lg">Loading analytics...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-950 px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 pt-20 sm:pt-24 ">
+      <div className="w-full max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6 sm:mb-8 md:mb-10 mt-16">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
+            <div>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2">Analytics Dashboard</h1>
+              <p className="text-zinc-400 text-sm sm:text-base">Track your call performance and insights</p>
+            </div>
+            <div className="flex flex-wrap gap-2 sm:gap-3 mt-4 sm:mt-0">
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm px-3 py-2">
+                <Download className="w-4 h-4 mr-2" />
+                Export Data
+              </Button>
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm px-3 py-2">
+                <Filter className="w-4 h-4 mr-2" />
+                Filter
+              </Button>
+            </div>
+          </div>
+          
+          {/* Time Range Selector */}
+          <div className="flex flex-wrap gap-2">
+            {(['week', 'month', 'year'] as const).map((range) => (
+              <Button
+                key={range}
+                variant={timeRange === range ? "default" : "outline"}
+                size="sm"
+                onClick={() => setTimeRange(range)}
+                className="text-xs sm:text-sm capitalize px-3 py-2"
+              >
+                {range}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-zinc-400 text-xs sm:text-sm">Total Calls</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{analyticsData?.totalCalls}</p>
+              </div>
+              <div className="bg-blue-500/20 p-2 sm:p-3 rounded-full">
+                <PhoneCall className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+              </div>
+            </div>
+          </Card>
+
+          <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-zinc-400 text-xs sm:text-sm">Success Rate</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{analyticsData?.successRate}%</p>
+              </div>
+              <div className="bg-green-500/20 p-2 sm:p-3 rounded-full">
+                <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-green-400" />
+              </div>
+            </div>
+          </Card>
+
+          <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-zinc-400 text-xs sm:text-sm">Avg Duration</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{analyticsData?.averageDuration}m</p>
+              </div>
+              <div className="bg-yellow-500/20 p-2 sm:p-3 rounded-full">
+                <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-400" />
+              </div>
+            </div>
+          </Card>
+
+          <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-zinc-400 text-xs sm:text-sm">Questions Answered</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{analyticsData?.totalQuestions}</p>
+              </div>
+              <div className="bg-purple-500/20 p-2 sm:p-3 rounded-full">
+                <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400" />
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Charts and Detailed Analytics */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          {/* Top Modules Chart */}
+          <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">Top Modules</h3>
+              <Badge variant="outline" className="text-xs">This {timeRange}</Badge>
+            </div>
+            <div className="space-y-3 sm:space-y-4">
+              {analyticsData?.topModules.map((module, index) => (
+                <div key={module.name} className="flex items-center justify-between">
+                  <div className="flex items-center min-w-0 flex-1">
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-blue-500/20 flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+                      <span className="text-xs font-medium text-blue-400">{index + 1}</span>
+                    </div>
+                    <span className="text-xs sm:text-sm md:text-base text-white truncate">{module.name}</span>
+                  </div>
+                  <div className="flex items-center ml-2">
+                    <div className="w-16 sm:w-20 md:w-24 bg-zinc-800 rounded-full h-2 mr-2 sm:mr-3">
+                      <div 
+                        className="bg-blue-500 h-2 rounded-full" 
+                        style={{ width: `${(module.calls / (analyticsData?.topModules[0]?.calls || 1)) * 100}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-xs sm:text-sm text-zinc-400 min-w-[2rem] text-right">{module.calls}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Call Status Distribution */}
+          <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">Call Status</h3>
+              <Badge variant="outline" className="text-xs">Distribution</Badge>
+            </div>
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-green-500 rounded-full mr-2 sm:mr-3"></div>
+                  <span className="text-xs sm:text-sm md:text-base text-white">Completed</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-xs sm:text-sm text-zinc-400 mr-2">{analyticsData?.completedCalls}</span>
+                  <span className="text-xs text-zinc-500">({analyticsData?.successRate}%)</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-red-500 rounded-full mr-2 sm:mr-3"></div>
+                  <span className="text-xs sm:text-sm md:text-base text-white">Failed</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-xs sm:text-sm text-zinc-400 mr-2">{analyticsData?.failedCalls}</span>
+                  <span className="text-xs text-zinc-500">({100 - (analyticsData?.successRate || 0)}%)</span>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Recent Calls Table */}
+        <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">Recent Calls</h3>
+            <Button variant="outline" size="sm" className="text-xs sm:text-sm px-3 py-2">
+              <Eye className="w-4 h-4 mr-2" />
+              View All
+            </Button>
+          </div>
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="min-w-full inline-block align-middle">
+              <div className="overflow-hidden">
+                <table className="min-w-full divide-y divide-zinc-800">
+                  <thead>
+                    <tr className="border-b border-zinc-800">
+                      <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Module</th>
+                      <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Customer</th>
+                      <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Status</th>
+                      <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Duration</th>
+                      <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Questions</th>
+                      <th className="text-left py-3 px-2 text-xs sm:text-sm text-zinc-400 font-medium">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/50">
+                    {analyticsData?.recentCalls.map((call) => (
+                      <tr key={call.id} className="hover:bg-zinc-800/30 transition-colors">
+                        <td className="py-3 px-2">
+                          <span className="text-xs sm:text-sm text-white truncate block max-w-[100px] sm:max-w-[120px]">{call.moduleName}</span>
+                        </td>
+                        <td className="py-3 px-2">
+                          <div>
+                            <span className="text-xs sm:text-sm text-white block truncate max-w-[100px] sm:max-w-[120px]">{call.customerName}</span>
+                            <span className="text-xs text-zinc-400 truncate block max-w-[100px] sm:max-w-[120px]">{call.phoneNumber}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-2">
+                          <Badge className={`text-xs ${getStatusColor(call.status)}`}>
+                            <span className="mr-1">{getStatusIcon(call.status)}</span>
+                            <span className="hidden sm:inline">{call.status}</span>
+                            <span className="sm:hidden">{call.status.charAt(0)}</span>
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-2">
+                          <span className="text-xs sm:text-sm text-white">{formatDuration(call.duration)}</span>
+                        </td>
+                        <td className="py-3 px-2">
+                          <span className="text-xs sm:text-sm text-white">{call.questionsAnswered}/{call.totalQuestions}</span>
+                        </td>
+                        <td className="py-3 px-2">
+                          <span className="text-xs text-zinc-400">{formatDate(call.createdAt)}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default AnalyticsPage; 

@@ -1,9 +1,9 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { Button } from "./ui/button";
-import { getUserModules } from "../lib/firebase";
-import type { VoiceModule } from "../lib/firebase";
+import { Upload, Phone, User, X, Check } from "lucide-react";
+import * as auth from "../lib/auth";
+import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
-import { getUserProfile, decrementUserTokens } from "../lib/firebase";
 
 interface Contact {
   name: string;
@@ -20,8 +20,6 @@ const CSV_TEMPLATE = "name,phone\nAbhigyan Raj,9234567890\nSandeep Mehta,9876543
 
 const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) => {
   const { user } = useAuth();
-  const [modules, setModules] = useState<VoiceModule[]>([]);
-  const [selectedModule, setSelectedModule] = useState<string>("");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [manualName, setManualName] = useState("");
   const [manualPhone, setManualPhone] = useState("");
@@ -30,29 +28,37 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) 
   const [dragActive, setDragActive] = useState(false);
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [tokenError, setTokenError] = useState("");
-  const [loadingModules, setLoadingModules] = useState(true);
-  const [userTokens, setUserTokens] = useState<number | null>(null);
+  const [calling, setCalling] = useState(false);
+  const [tokenInfo, setTokenInfo] = useState<{
+    costPerCall: number;
+    currentBalance: number;
+    canMakeCall: boolean;
+  } | null>(null);
 
-  useEffect(() => {
-    const fetchModules = async () => {
-      if (!user) return;
-      setLoadingModules(true);
-      const mods = await getUserModules(user.uid);
-      setModules(mods);
-      setLoadingModules(false);
-      if (mods.length > 0) setSelectedModule(mods[0].id!);
-    };
-    fetchModules();
-    // Fetch user tokens
-    const fetchTokens = async () => {
-      if (user) {
-        const profile = await getUserProfile(user.uid);
-        setUserTokens(profile ? profile.tokens : 0);
+  // Fetch token information on component mount
+  React.useEffect(() => {
+    const fetchTokenInfo = async () => {
+      try {
+        const token = auth.getStoredToken();
+        
+        if (token) {
+          const response = await api.getCallCostInfo(token);
+          
+          if (response.success) {
+            setTokenInfo(response);
+          } else {
+            console.error('Failed to get call cost info:', response.error);
+          }
+        } else {
+          console.log('No token found, skipping token info fetch');
+        }
+      } catch (error) {
+        console.error('Error fetching token info:', error);
       }
     };
-    fetchTokens();
-  }, [user]);
+
+    fetchTokenInfo();
+  }, []);
 
   // Minimal CSV parser: expects header row with 'name' and 'phone' columns
   const parseCSV = (csv: string) => {
@@ -121,53 +127,121 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) 
     setContacts(cs => cs.map((c, i) => i === idx ? { ...c, selected: checked } : c));
   };
 
+  const makeCallToBackend = async (contact: { name: string; phone: string }) => {
+    try {
+      const token = auth.getStoredToken();
+      
+      if (!token) {
+        console.error('No authentication token found');
+        setError('Authentication required. Please sign in again.');
+        return false;
+      }
+
+      const result = await api.initiateCall(
+        token,
+        'simple-module',
+        contact.phone,
+        contact.name
+      );
+
+      if (result.success) {
+        // Update token info after successful call
+        if (result.remainingTokens !== undefined) {
+          setTokenInfo(prev => prev ? {
+            ...prev,
+            currentBalance: result.remainingTokens
+          } : null);
+        }
+        return true;
+      } else {
+        console.error('Call initiation failed:', result.error);
+        
+        // Handle insufficient tokens error
+        if (result.error === 'Insufficient tokens') {
+          setError(`Insufficient tokens: ${result.message}`);
+          return false;
+        }
+        
+        setError(`Call failed: ${result.message || result.error}`);
+        return false;
+      }
+    } catch (error: any) {
+      console.error('Error making call:', error);
+      
+      // Handle insufficient tokens error from API
+      if (error.message?.includes('Insufficient tokens') || error.status === 402) {
+        setError('Insufficient tokens to make this call. Please buy more tokens.');
+        return false;
+      }
+      
+      // Handle network errors
+      if (error.message?.includes('fetch') || error.message?.includes('network')) {
+        setError('Network error. Please check your connection and try again.');
+        return false;
+      }
+      
+      setError(`Call failed: ${error.message || 'Unknown error'}`);
+      return false;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
-    setTokenError("");
-    let needed = 1;
-    let count = 1;
-    if (contacts.length > 0) {
-      const selected = contacts.filter(c => c.selected);
-      count = selected.length;
-      needed = count;
-      if (selected.length === 0) {
-        setError("Select at least one contact");
-        return;
+    setCalling(true);
+
+    try {
+      let contactsToCall: { name: string; phone: string }[] = [];
+
+      if (contacts.length > 0) {
+        const selected = contacts.filter(c => c.selected);
+        if (selected.length === 0) {
+          setError("Select at least one contact");
+          setCalling(false);
+          return;
+        }
+        contactsToCall = selected.map(({ name, phone }) => ({ name, phone }));
+      } else {
+        // Manual entry fallback
+        if (!manualName || !manualPhone) {
+          setError("Enter name and phone");
+          setCalling(false);
+          return;
+        }
+        contactsToCall = [{ name: manualName, phone: manualPhone }];
       }
+
+      setSuccess(`Initiating calls to ${contactsToCall.length} contact(s)...`);
+
+      // Make calls to backend
+      let successCount = 0;
+      for (const contact of contactsToCall) {
+        const success = await makeCallToBackend(contact);
+        if (success) {
+          successCount++;
+        }
+        // Small delay between calls
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      if (successCount > 0) {
+        setSuccess(`Successfully initiated ${successCount} call(s)!`);
+        setTimeout(() => {
+          setSuccess("");
+          onSubmit(contactsToCall);
+          onClose();
+        }, 2000);
+      } else {
+        setError("Failed to initiate any calls. Please try again.");
+      }
+
+    } catch (error) {
+      console.error('Error in handleSubmit:', error);
+      setError("An error occurred while making calls. Please try again.");
+    } finally {
+      setCalling(false);
     }
-    if (!user || userTokens === null) {
-      setTokenError("Unable to fetch your tokens. Please try again.");
-      return;
-    }
-    if (userTokens < needed) {
-      setTokenError(`Not enough tokens! You need ${needed}, but have only ${userTokens}. Please buy more tokens.`);
-      return;
-    }
-    if (contacts.length > 0) {
-      const selected = contacts.filter(c => c.selected);
-      setSuccess(`Ready to call ${selected.length} contact(s)!`);
-      setTimeout(async () => {
-        await decrementUserTokens(user.uid, selected.length);
-        setSuccess("");
-        onSubmit(selected.map(({ name, phone }) => ({ name, phone })));
-        onClose();
-      }, 1200);
-      return;
-    }
-    // Manual entry fallback
-    if (!manualName || !manualPhone) {
-      setError("Enter name and phone");
-      return;
-    }
-    setSuccess("Ready to call 1 contact!");
-    setTimeout(async () => {
-      await decrementUserTokens(user.uid, 1);
-      setSuccess("");
-      onSubmit([{ name: manualName, phone: manualPhone }]);
-      onClose();
-    }, 1200);
   };
 
   // Filtered contacts for search
@@ -180,25 +254,27 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) 
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:gap-5 w-full max-w-md mx-auto p-2 sm:p-0">
-      {/* Module select */}
-      <div className="flex flex-col gap-1">
-        <label className="text-sm text-white/80 font-medium">Select Module:</label>
-        <select
-          value={selectedModule}
-          onChange={e => setSelectedModule(e.target.value)}
-          className="rounded-lg border border-zinc-700 px-3 py-2 text-xs sm:text-sm bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-400/20 w-full"
-        >
-          {loadingModules ? (
-            <option value="">Loading modules...</option>
-          ) : modules.length === 0 ? (
-            <option value="">No modules found. Please add one in your settings.</option>
-          ) : (
-            modules.map(m => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))
+      {/* Token Information */}
+      {tokenInfo && (
+        <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-zinc-300">Call Cost:</span>
+            <span className="text-sm font-medium text-blue-400">{tokenInfo.costPerCall} tokens per call</span>
+          </div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-zinc-300">Current Balance:</span>
+            <span className={`text-sm font-medium ${tokenInfo.currentBalance >= tokenInfo.costPerCall ? 'text-green-400' : 'text-red-400'}`}>
+              {tokenInfo.currentBalance} tokens
+            </span>
+          </div>
+          {!tokenInfo.canMakeCall && (
+            <div className="mt-2 p-2 bg-red-500/10 border border-red-500/20 rounded text-xs text-red-400">
+              Insufficient tokens. You need {tokenInfo.costPerCall} tokens to make a call.
+            </div>
           )}
-        </select>
-      </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
         <label className="text-sm text-white/80 font-medium">Upload CSV (name, phone):</label>
         <a
@@ -287,8 +363,13 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) 
       )}
       {error && <div className="text-red-400 text-xs text-center font-medium">{error}</div>}
       {success && <div className="text-green-400 text-xs text-center font-medium">{success}</div>}
-      {tokenError && <div className="text-red-400 text-xs text-center font-medium">{tokenError}</div>}
-      <Button type="submit" className="mt-2 rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors w-full sm:w-auto text-xs sm:text-base">Submit</Button>
+      <Button 
+        type="submit" 
+        className="mt-2 rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors w-full sm:w-auto text-xs sm:text-base"
+        disabled={calling}
+      >
+        {calling ? "Making Calls..." : "Submit"}
+      </Button>
     </form>
   );
 };

@@ -1,128 +1,218 @@
-import React, { useEffect, useState } from "react";
-import { Layers, BarChart3, Settings, Menu, LogOut, User } from "lucide-react";
-import { Link } from 'react-router-dom';
+import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { getUserProfile } from "../lib/firebase";
-
-const navLinks = [
-  { label: "My Modules", icon: <Layers className="w-5 h-5 md:w-4 md:h-4 mr-0 md:mr-1" />, href: "/modules" },
-  { label: "Analytics", icon: <BarChart3 className="w-5 h-5 md:w-4 md:h-4 mr-0 md:mr-1" />, href: "/analytics" },
-  { label: "Settings", icon: <Settings className="w-5 h-5 md:w-4 md:h-4 mr-0 md:mr-1" />, href: "/settings" },
-];
+import { LogOut, Menu, User, X, Home, Layers, BarChart3, Settings, Coins, Plus } from "lucide-react";
+import * as auth from "../lib/auth";
+import { Link, useLocation } from "react-router-dom";
 
 const Navbar: React.FC = () => {
-  const [tokens, setTokens] = useState<number | null>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [userTokens, setUserTokens] = useState<number | null>(null);
+  const location = useLocation();
 
-  useEffect(() => {
-    let unsub = false;
+  React.useEffect(() => {
     const fetchTokens = async () => {
       if (user) {
-        const profile = await getUserProfile(user.uid);
-        if (!unsub) setTokens(profile ? profile.tokens : 0);
-      } else {
-        setTokens(null);
+        const profile = await auth.getUserProfile(user._id);
+        setUserTokens(profile ? profile.tokens : user.tokens);
       }
     };
     fetchTokens();
-    return () => { unsub = true; };
   }, [user]);
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Sign out error:", error);
+    }
+  };
+
+  const navItems = [
+    { name: "My Voice Modules", path: "/modules", icon: <Layers className="w-4 h-4" /> },
+    { name: "Analytics", path: "/analytics", icon: <BarChart3 className="w-4 h-4" /> },
+    { name: "Settings", path: "/settings", icon: <Settings className="w-4 h-4" /> },
+  ];
+
   return (
-    <nav className="w-full flex items-center px-4 md:px-6 py-4 bg-transparent backdrop-blur-md fixed top-0 left-0 z-30 ">
-      {/* Logo (left) */}
-      <div className="flex items-center select-none z-10">
-        <Link to="/" className="flex items-center gap-1">
-          <span className="text-xl font-extrabold tracking-tight text-white font-[Sora]">Vok</span>
-          <span className="text-xl font-medium tracking-tight text-white font-[Sora]">.ai</span>
-        </Link>
-      </div>
-      {/* Absolutely centered nav links */}
-      <div className="hidden md:flex gap-8 lg:gap-10 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        {navLinks.map(link => (
-          <Link
-            key={link.label}
-            to={link.href}
-            className="flex items-center text-white/80 hover:text-white font-medium text-base transition-colors px-2 md:px-3 py-2 rounded-lg"
-          >
-            {link.icon}
-            <span className="hidden md:inline ml-1">{link.label}</span>
-          </Link>
-        ))}
-      </div>
-      {/* Token display and buy button (right) */}
-      <div className="flex items-center gap-2 md:gap-4 ml-auto z-10">
-        {user && (
-          <span className="bg-blue-900/60 text-blue-200 px-2 md:px-3 py-1 rounded-lg font-semibold text-xs md:text-sm select-none border border-blue-400/30">
-            Tokens: {tokens !== null ? tokens : "..."}
-          </span>
-        )}
-        <Link
-          to="/buy-token"
-          className="bg-blue-500 hover:bg-blue-600 text-white px-2 md:px-3 py-1 rounded-lg font-medium text-xs md:text-sm transition-colors border border-blue-400/30"
-        >
-          Buy Tokens
-        </Link>
-        {user && (
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 text-white/80 text-xs">
-              <User className="w-3 h-3" />
-              <span className="hidden md:inline">{user.displayName || user.email}</span>
-            </div>
-            <button
-              onClick={signOut}
-              className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-lg font-medium text-xs transition-colors"
-              title="Sign Out"
-            >
-              <LogOut className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-        {/* Hamburger for mobile */}
-        <button className="md:hidden ml-2 p-2 rounded hover:bg-white/10" onClick={() => setMobileOpen(v => !v)} aria-label="Open menu">
-          <Menu className="w-6 h-6 text-white" />
-        </button>
-      </div>
-      {/* Mobile menu overlay */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 bg-black/70 flex flex-col items-center justify-start pt-24 md:hidden" onClick={() => setMobileOpen(false)}>
-          <div className="flex flex-col gap-6 w-full max-w-xs mx-auto bg-zinc-900/95 rounded-xl p-6 shadow-lg border border-white/10">
-            {navLinks.map(link => (
-              <Link
-                key={link.label}
-                to={link.href}
-                className="flex items-center gap-3 text-white text-lg font-semibold py-2 px-3 rounded-lg hover:bg-blue-900/30 transition-colors"
-                onClick={() => setMobileOpen(false)}
-              >
-                {link.icon}
-                {link.label}
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-transparent backdrop-blur-sm">
+      <div className="w-full mx-auto">
+        <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-10">
+          {/* Parent Div containing all three sections */}
+          <div className="flex items-center justify-between w-full">
+            {/* Div 1: Logo */}
+            <div className="flex">
+              <Link to="/" className="flex">
+                <h1 className="text-xl font-bold text-white hover:text-blue-400 transition-colors">Vok.ai</h1>
               </Link>
-            ))}
-            <Link
-              to="/buy-token"
-              className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold text-base transition-colors border border-blue-400/30 justify-center"
-              onClick={() => setMobileOpen(false)}
-            >
-              Buy Tokens
-            </Link>
+            </div>
+
+            {/* Div 2: Navigation Options - Desktop Only */}
             {user && (
-              <>
-                <div className="flex items-center gap-2 text-white/80 text-sm py-2 px-3">
-                  <User className="w-4 h-4" />
-                  <span>{user.displayName || user.email}</span>
+              <div className="hidden lg:flex items-center gap-6 ml-72">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      location.pathname === item.path
+                        ? "text-blue-400 bg-blue-400/10"
+                        : "text-zinc-300 hover:text-white hover:bg-zinc-800/50"
+                    }`}
+                  >
+                    {item.icon}
+                    {item.name}
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {/* Div 3: User Elements (Buy Tokens, Token Display, User Info) - Desktop Only */}
+            <div className="hidden lg:flex items-center space-x-3">
+              {user ? (
+                <>
+                  {/* Buy Tokens Button */}
+                  <Link
+                    to="/buy-token"
+                    className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Buy Tokens
+                  </Link>
+
+                  {/* Token Display */}
+                  <div className="flex items-center gap-1.5 bg-blue-500/20 border border-blue-500/30 rounded-md px-2.5 py-1.5">
+                    <Coins className="w-3.5 h-3.5 text-blue-400" />
+                    <span className="text-xs font-medium text-white">
+                      {userTokens !== null ? userTokens : user.tokens} tokens
+                    </span>
+                  </div>
+
+                  {/* User Info & Logout */}
+                  <div className="flex items-center space-x-1.5">
+                    <div className="flex items-center space-x-1.5">
+                      <User className="w-4 h-4 text-zinc-400" />
+                      <span className="text-zinc-300 text-xs">{user.name}</span>
+                    </div>
+                    <button
+                      onClick={handleSignOut}
+                      className="text-zinc-400 hover:text-white transition-colors p-1"
+                      title="Sign out"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* Login/Signup Buttons */
+                <div className="flex items-center space-x-2">
+                  <Link
+                    to="/"
+                    className="text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
+                  >
+                    Sign Up
+                  </Link>
+                  <Link
+                    to="/"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                  >
+                    Log In
+                  </Link>
                 </div>
-                <button
-                  onClick={() => {
-                    signOut();
-                    setMobileOpen(false);
-                  }}
-                  className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold text-base transition-colors"
+              )}
+            </div>
+
+            {/* Mobile menu button */}
+            <div className="lg:hidden">
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="text-zinc-400 hover:text-white transition-colors p-1"
+              >
+                {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile menu */}
+      {isMenuOpen && (
+        <div className="lg:hidden">
+          <div className="px-4 py-3 space-y-3 bg-zinc-900/95 backdrop-blur-sm border-t border-zinc-800">
+            {user ? (
+              <>
+                {/* Mobile Navigation */}
+                <div className="space-y-2">
+                  {navItems.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                        location.pathname === item.path
+                          ? "text-blue-400 bg-blue-400/10"
+                          : "text-zinc-300 hover:text-white hover:bg-zinc-800"
+                      }`}
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      {item.icon}
+                      {item.name}
+                    </Link>
+                  ))}
+                </div>
+                
+                {/* Mobile Buy Tokens Button */}
+                <Link
+                  to="/buy-token"
+                  className="flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors text-zinc-300 hover:text-white hover:bg-zinc-800"
+                  onClick={() => setIsMenuOpen(false)}
                 >
-                  <LogOut className="w-4 h-4" />
-                  Sign Out
-                </button>
+                  <Plus className="w-4 h-4" />
+                  Buy Tokens
+                </Link>
+                
+                {/* Mobile Token Display */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg">
+                  <Coins className="w-4 h-4 text-blue-400" />
+                  <span className="text-sm font-medium text-white">
+                    {userTokens !== null ? userTokens : user.tokens} tokens
+                  </span>
+                </div>
+
+                {/* Mobile User Info */}
+                <div className="flex items-center justify-between px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-zinc-400" />
+                    <span className="text-zinc-300 text-sm">{user.name}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      handleSignOut();
+                      setIsMenuOpen(false);
+                    }}
+                    className="text-zinc-400 hover:text-white transition-colors p-1"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
               </>
+            ) : (
+              /* Mobile Auth Buttons */
+              <div className="space-y-2">
+                <Link
+                  to="/"
+                  className="text-zinc-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Sign Up
+                </Link>
+                <Link
+                  to="/"
+                  className="bg-blue-600 hover:bg-blue-700 text-white block px-3 py-2 rounded-md text-base font-medium transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Log In
+                </Link>
+              </div>
             )}
           </div>
         </div>

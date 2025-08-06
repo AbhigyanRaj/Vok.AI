@@ -9,14 +9,42 @@ const moduleSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
+    trim: true,
+  },
+  description: {
+    type: String,
+    default: '',
+  },
+  type: {
+    type: String,
+    enum: ['loan', 'credit_card', 'custom'],
+    required: true,
   },
   questions: [{
-    type: String,
-    required: true,
+    question: {
+      type: String,
+      required: true,
+    },
+    order: {
+      type: Number,
+      required: true,
+    },
+    required: {
+      type: Boolean,
+      default: true,
+    },
   }],
   isActive: {
     type: Boolean,
     default: true,
+  },
+  totalCalls: {
+    type: Number,
+    default: 0,
+  },
+  successfulCalls: {
+    type: Number,
+    default: 0,
   },
 }, {
   timestamps: true,
