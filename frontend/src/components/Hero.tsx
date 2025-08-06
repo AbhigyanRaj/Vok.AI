@@ -175,6 +175,7 @@ const Hero: React.FC = () => {
       </div>
       
       <ContactUploader
+        selectedModule={selectedModule}
         onSubmit={contacts => {
           console.log("Submitted contacts:", contacts);
           console.log("Selected module:", selectedModule);

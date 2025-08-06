@@ -4,6 +4,8 @@ import { transcribeAudio, generateSummary, evaluateApplication } from '../config
 import { formatPhoneNumber, validatePhoneNumber } from '../utils/phoneUtils.js';
 import twilio from 'twilio';
 import User from '../models/User.js';
+import Module from '../models/Module.js';
+import Call from '../models/Call.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -18,9 +20,9 @@ router.post('/initiate', protect, async (req, res) => {
     const userId = req.user._id;
 
     // Validation
-    if (!phoneNumber || !customerName) {
+    if (!phoneNumber || !customerName || !moduleId) {
       return res.status(400).json({ 
-        error: 'Missing required fields: phoneNumber and customerName are required' 
+        error: 'Missing required fields: moduleId, phoneNumber and customerName are required' 
       });
     }
 
@@ -28,6 +30,17 @@ router.post('/initiate', protect, async (req, res) => {
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get the module
+    const module = await Module.findById(moduleId);
+    if (!module) {
+      return res.status(404).json({ error: 'Module not found' });
+    }
+
+    // Check if user owns this module
+    if (module.userId.toString() !== userId.toString()) {
+      return res.status(403).json({ error: 'Access denied to this module' });
     }
 
     // Check if user has enough tokens for a call (5 tokens per call)
@@ -64,6 +77,8 @@ router.post('/initiate', protect, async (req, res) => {
 
     console.log('\n=== Initiating REAL Call ===');
     console.log('User ID:', userId);
+    console.log('Module ID:', moduleId);
+    console.log('Module Name:', module.name);
     console.log('Customer:', customerName);
     console.log('Phone:', formattedPhone);
     console.log('Tokens before call:', user.tokens);
@@ -79,23 +94,68 @@ router.post('/initiate', protect, async (req, res) => {
     // Create Twilio client
     const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-    // For now, let's make a simple call without webhooks
-    // We'll use Twilio's built-in TwiML for a simple voice message
-    const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say(`Hello ${customerName}, this is a test call from Vok.AI. Thank you for testing our system.`, {
-      voice: 'Polly.Aditi'
-    });
-    twiml.hangup();
-
-    // Make the actual call
-    console.log('📞 Making REAL call to:', formattedPhone);
-    console.log('📞 From number:', process.env.TWILIO_PHONE_NUMBER);
+    // Check if we have a public URL (ngrok) for webhooks
+    const publicUrl = process.env.NGROK_URL || process.env.BASE_URL;
+    let call; // Declare call variable outside the if/else blocks
     
-    const call = await twilioClient.calls.create({
-      twiml: twiml.toString(),
-      to: formattedPhone,
-      from: process.env.TWILIO_PHONE_NUMBER
-    });
+    if (publicUrl && !publicUrl.includes('localhost')) {
+      // Use webhook for interactive flow
+      console.log('📞 Using webhook flow with public URL:', publicUrl);
+      
+      const webhookUrl = new URL(`${publicUrl}/api/calls/handle-call`);
+      webhookUrl.searchParams.set('moduleId', moduleId);
+      webhookUrl.searchParams.set('customerName', customerName);
+      webhookUrl.searchParams.set('phoneNumber', formattedPhone);
+      webhookUrl.searchParams.set('step', '0');
+
+      const statusCallbackUrl = new URL(`${publicUrl}/api/calls/status`);
+      
+      call = await twilioClient.calls.create({
+        method: 'POST',
+        url: webhookUrl.toString(),
+        to: formattedPhone,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        statusCallback: statusCallbackUrl.toString(),
+        statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+        statusCallbackMethod: 'POST'
+      });
+    } else {
+      // Fallback to simple TwiML for local development
+      console.log('📞 Using simple TwiML flow for local development');
+      
+      const twiml = new twilio.twiml.VoiceResponse();
+      
+      // Create a simple call flow for testing
+      twiml.say(`Hello ${customerName}, this is a call from Vok.AI. We have a few questions for you.`, {
+        voice: 'Polly.Aditi'
+      });
+      twiml.pause({ length: 1 });
+      
+      // Ask all questions from the module
+      if (module.questions && module.questions.length > 0) {
+        module.questions.forEach((question, index) => {
+          twiml.say(`Question ${index + 1}: ${question.question}`, { voice: 'Polly.Aditi' });
+          twiml.pause({ length: 3 }); // Give time for response
+        });
+        twiml.say('Thank you for answering all our questions. Have a great day!', { voice: 'Polly.Aditi' });
+      } else {
+        twiml.say('Thank you for taking our call. Have a great day!', { voice: 'Polly.Aditi' });
+      }
+      
+      twiml.hangup();
+      
+      // Create status callback URL for local development
+      const statusCallbackUrl = new URL(`${process.env.BASE_URL}/api/calls/status`);
+      
+      call = await twilioClient.calls.create({
+        twiml: twiml.toString(),
+        to: formattedPhone,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        statusCallback: statusCallbackUrl.toString(),
+        statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed', 'failed', 'busy', 'no-answer', 'canceled'],
+        statusCallbackMethod: 'POST'
+      });
+    }
 
     console.log('✅ REAL call initiated!');
     console.log('Call SID:', call.sid);
@@ -120,22 +180,38 @@ router.post('/initiate', protect, async (req, res) => {
     console.log('Tokens after call:', user.tokens);
     console.log('Total calls made:', user.totalCallsMade);
 
-    // Create call record
-    const callRecord = {
-      _id: `call-${Date.now()}`,
+    // Create call record in database
+    const callRecord = new Call({
       userId: userId,
+      moduleId: moduleId,
       customerName: customerName.trim(),
       phoneNumber: formattedPhone,
       twilioCallSid: call.sid,
-      status: call.status,
+      status: call.status || 'initiated', // Use actual call status
       currentStep: 0,
       tokensUsed: user.getCostPerCall(),
-      createdAt: new Date()
-    };
+      duration: 0, // Will be updated when call completes
+    });
+
+    // Store initial conversation
+    if (module.questions && module.questions.length > 0) {
+      const transcription = module.questions.map((question, index) => 
+        `VokAI: Question ${index + 1}: ${question.question}\nUser: [Call in progress - responses will be collected]\n`
+      ).join('');
+      callRecord.transcription = transcription;
+    }
+
+    try {
+      await callRecord.save();
+      console.log('✅ Call record saved to database');
+    } catch (error) {
+      console.error('❌ Error saving call record:', error);
+      // Continue with the call even if database save fails
+    }
 
     // Add to active calls
-    activeCalls.set(callRecord._id, {
-      ...callRecord,
+    activeCalls.set(callRecord._id.toString(), {
+      ...callRecord.toObject(),
       timestamp: Date.now()
     });
 
@@ -143,6 +219,11 @@ router.post('/initiate', protect, async (req, res) => {
       success: true,
       message: 'REAL call initiated successfully!',
       call: callRecord,
+      module: {
+        id: module._id,
+        name: module.name,
+        questions: module.questions
+      },
       tokensUsed: user.getCostPerCall(),
       remainingTokens: user.tokens,
       note: 'You should receive a call within 30 seconds'
@@ -173,6 +254,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
     console.log('Step:', step);
     console.log('Phone:', phoneNumber);
     console.log('Previous Response:', previousResponse);
+    console.log('Request Body:', req.body);
+    console.log('Request Query:', req.query);
     
     // Enhanced user input logging
     if (previousResponse) {
@@ -182,23 +265,30 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
     }
 
     // Get module and its questions
-    // const module = await Module.findById(moduleId); // Removed database dependency
-    // if (!module) {
-    //   const errorResponse = createTwiMLResponse();
-    //   errorResponse.say('Sorry, there was an error. Please try again later.', { voice: 'Polly.Aditi' });
-    //   errorResponse.hangup();
-    //   return res.type('text/xml').send(errorResponse.toString());
-    // }
+    const module = await Module.findById(moduleId);
+    if (!module) {
+      const errorResponse = createTwiMLResponse();
+      errorResponse.say('Sorry, there was an error. Please try again later.', { voice: 'Polly.Aditi' });
+      errorResponse.hangup();
+      return res.type('text/xml').send(errorResponse.toString());
+    }
 
-    // const questions = module.questions.sort((a, b) => a.order - b.order); // Removed database dependency
+    const questions = module.questions.sort((a, b) => a.order - b.order);
     const twimlResponse = createTwiMLResponse();
+
+    // Find the call record
+    const call = await Call.findOne({ 
+      phoneNumber: phoneNumber, 
+      status: { $in: ['initiated', 'ringing', 'in-progress', 'answered'] },
+      moduleId: moduleId
+    });
 
     // Handle different steps of the call
     if (step === 0) {
       // Initial greeting
       console.log('Starting new call flow (step 0)');
       twimlResponse.say(
-        `Hi ${customerName}, we are from VokAI. Is it the right time to speak to you about your ${moduleId === 'mock-module-1' ? 'credit card' : 'loan'} application?`,
+        `Hi ${customerName}, we are from VokAI. Is it the right time to speak to you about our questions?`,
         { voice: 'Polly.Aditi' }
       );
 
@@ -207,6 +297,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       nextUrl.searchParams.set('customerName', customerName);
       nextUrl.searchParams.set('step', '1');
       nextUrl.searchParams.set('phoneNumber', phoneNumber);
+
+      console.log('Next URL for step 1:', nextUrl.toString());
 
       const gather = twimlResponse.gather({
         input: 'speech',
@@ -221,11 +313,10 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         previousResponse.toLowerCase().includes(word))) {
         
         console.log('\n✅ CUSTOMER CONFIRMED AVAILABILITY!');
-        console.log('🎯 Moving to service description...');
+        console.log('🎯 Moving to questions...');
         
-        // const displayType = module.type === 'credit_card' ? 'credit card' : module.type; // Removed database dependency
         twimlResponse.say(
-          `Great! Let me tell you about our service:`,
+          `Great! Let me ask you a few questions.`,
           { voice: 'Polly.Aditi' }
         );
         twimlResponse.pause({ length: 1 });
@@ -242,7 +333,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           timeout: 10,
           method: 'POST'
         });
-        // gather.say(questions[0].question, { voice: 'Polly.Aditi' }); // Removed database dependency
+        gather.say(questions[0].question, { voice: 'Polly.Aditi' });
 
       } else {
         console.log('\n❌ CUSTOMER DECLINED OR NO RESPONSE');
@@ -253,48 +344,60 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           { voice: 'Polly.Aditi' }
         );
         twimlResponse.hangup();
+
+        // Update call status
+        if (call) {
+          call.status = 'completed';
+          call.currentStep = step;
+          await call.save();
+        }
       }
 
-    } else if (step < 2) { // Removed questions.length + 2
+    } else if (step < questions.length + 2) {
       // Handle question responses
       const questionIndex = step - 2;
       
       // Store previous response if available
-      if (previousResponse && phoneNumber) {
+      if (previousResponse && phoneNumber && call) {
         console.log(`Storing response for question ${questionIndex}: ${previousResponse}`);
         
         // Update call record with response
-        // await Call.findOneAndUpdate( // Removed database dependency
-        //   { phoneNumber: phoneNumber, status: { $in: ['initiated', 'ringing', 'in-progress', 'answered'] } },
-        //   { 
-        //     $set: { 
-        //       [`responses.${questionIndex}`]: previousResponse,
-        //       currentStep: step,
-        //       status: 'in-progress'
-        //     }
-        //   }
-        // );
+        call.responses.set(questionIndex.toString(), previousResponse);
+        call.currentStep = step;
+        call.status = 'in-progress';
+        
+        // Store conversation in transcription field
+        const conversation = call.transcription ? call.transcription + '\n' : '';
+        const newConversation = conversation + `VokAI: ${questions[questionIndex - 1]?.question || 'Question'}\nUser: ${previousResponse}\n`;
+        call.transcription = newConversation;
+        
+        await call.save();
 
-        // Update active call tracking
-        if (activeCalls.has(phoneNumber)) {
-          activeCalls.get(phoneNumber).responses.set(questionIndex, previousResponse);
-        }
+        console.log('✅ Response stored in database');
+        console.log('✅ Conversation updated:', newConversation);
       }
 
       // Check if we've reached the end of questions
-      if (questionIndex >= 2) { // Removed questions.length
+      if (questionIndex >= questions.length) {
         // End of questions - play outro
         console.log('End of questions reached, playing outro...');
         twimlResponse.say(
-          'Thank you for providing the information. We are now evaluating your application.',
+          'Thank you for providing the information. We have recorded all your responses.',
           { voice: 'Polly.Aditi' }
         );
         twimlResponse.pause({ length: 1 });
         twimlResponse.say(
-          'Our team will reach out to you within 24 hours with the results. Have a great day!',
+          'Our team will review your responses. Have a great day!',
           { voice: 'Polly.Aditi' }
         );
         twimlResponse.hangup();
+
+        // Update call status to completed
+        if (call) {
+          call.status = 'completed';
+          call.currentStep = step;
+          await call.save();
+        }
 
       } else {
         // Ask next question
@@ -310,8 +413,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           timeout: 10,
           method: 'POST'
         });
-        // gather.say(questions[questionIndex].question, { voice: 'Polly.Aditi' }); // Removed database dependency
-        console.log(`Asked question ${questionIndex}: ${moduleId === 'mock-module-1' ? 'Is it the right time to speak to you about your credit card application?' : 'Is it the right time to speak to you about your loan application?'}`); // Placeholder question
+        gather.say(questions[questionIndex].question, { voice: 'Polly.Aditi' });
+        console.log(`Asked question ${questionIndex}: ${questions[questionIndex].question}`);
       }
     }
 
@@ -339,19 +442,48 @@ router.post('/status', validateTwilioRequest, async (req, res) => {
     console.log('Status:', CallStatus);
     console.log('Duration:', CallDuration);
     console.log('Phone:', phoneNumber);
+    console.log('Request Body:', req.body);
+    console.log('Request Headers:', req.headers);
 
     // Update call record
-    // const call = await Call.findOne({ twilioCallSid: CallSid }); // Removed database dependency
-    // if (call) {
-    //   call.status = CallStatus;
-    //   if (CallDuration) call.duration = parseInt(CallDuration);
-    //   await call.save();
+    const call = await Call.findOne({ twilioCallSid: CallSid });
+    if (call) {
+      const previousStatus = call.status;
+      call.status = CallStatus;
+      if (CallDuration) call.duration = parseInt(CallDuration);
+      
+      // Update transcription based on call status
+      if (['failed', 'busy', 'no-answer', 'canceled'].includes(CallStatus)) {
+        // Call was cut off or failed
+        call.transcription = call.transcription.replace(
+          /User: \[Call in progress - responses will be collected\]/g,
+          'User: [Call was cut off - no response collected]'
+        );
+        console.log('❌ Call was cut off or failed');
+      } else if (CallStatus === 'completed' && call.duration < 30) {
+        // Call completed but was too short (likely cut off)
+        call.transcription = call.transcription.replace(
+          /User: \[Call in progress - responses will be collected\]/g,
+          'User: [Call ended too quickly - likely cut off]'
+        );
+        console.log('⚠️ Call completed but was too short');
+      } else if (CallStatus === 'completed') {
+        // Call completed successfully
+        call.transcription = call.transcription.replace(
+          /User: \[Call in progress - responses will be collected\]/g,
+          'User: [Call completed successfully]'
+        );
+        console.log('✅ Call completed successfully');
+      }
+      
+      await call.save();
+      console.log('✅ Call status updated in database');
 
-    //   // If call completed, process the application
-    //   if (['completed', 'failed', 'busy', 'no-answer', 'canceled'].includes(CallStatus)) {
-    //     await processCallCompletion(call, phoneNumber);
-    //   }
-    // }
+      // If call completed, process the responses
+      if (['completed', 'failed', 'busy', 'no-answer', 'canceled'].includes(CallStatus)) {
+        await processCallCompletion(call, phoneNumber);
+      }
+    }
 
     res.sendStatus(200);
   } catch (error) {
@@ -374,11 +506,11 @@ async function processCallCompletion(call, phoneNumber) {
     }
 
     // Get module to determine application type
-    // const module = await Module.findById(call.moduleId); // Removed database dependency
-    // if (!module) {
-    //   console.log('Module not found for call');
-    //   return;
-    // }
+    const module = await Module.findById(call.moduleId);
+    if (!module) {
+      console.log('Module not found for call');
+      return;
+    }
 
     // Convert Map to object for OpenAI
     const responseData = {};
@@ -391,7 +523,7 @@ async function processCallCompletion(call, phoneNumber) {
     // Evaluate application using OpenAI
     let evaluation = 'INVESTIGATION_REQUIRED';
     try {
-      evaluation = await evaluateApplication('credit_card', responseData); // Placeholder module type
+      evaluation = await evaluateApplication(module.type, responseData);
     } catch (error) {
       console.error('Evaluation error:', error);
     }
@@ -413,30 +545,30 @@ async function processCallCompletion(call, phoneNumber) {
     }
 
     // Update call record with evaluation
-    // call.evaluation = { // Removed database dependency
-    //   result: evaluation,
-    //   comments
-    // };
+    call.evaluation = {
+      result: evaluation,
+      comments
+    };
     
     // Generate summary using OpenAI
     try {
       const responsesText = Object.entries(responseData)
         .map(([key, value]) => `Q${key}: ${value}`)
         .join('. ');
-      // call.summary = await generateSummary(responsesText); // Removed database dependency
+      call.summary = await generateSummary(responsesText);
     } catch (error) {
       console.error('Summary generation error:', error);
-      // call.summary = 'Summary generation failed'; // Removed database dependency
+      call.summary = 'Summary generation failed';
     }
 
-    // await call.save(); // Removed database dependency
+    await call.save();
 
     // Update module statistics
-    // if (evaluation === 'YES') { // Removed database dependency
-    //   await Module.findByIdAndUpdate(call.moduleId, {
-    //     $inc: { successfulCalls: 1 }
-    //   });
-    // }
+    if (evaluation === 'YES') {
+      await Module.findByIdAndUpdate(call.moduleId, {
+        $inc: { successfulCalls: 1 }
+      });
+    }
 
     // Clean up active call tracking
     if (phoneNumber && activeCalls.has(phoneNumber)) {
@@ -531,36 +663,46 @@ router.get('/cost-info', protect, async (req, res) => {
 });
 
 // Get call history
-router.get('/history', async (req, res) => {
+router.get('/history', protect, async (req, res) => {
   try {
     const { page = 1, limit = 20, status, moduleId } = req.query;
+    const userId = req.user._id;
     
-    // const query = { userId: req.user._id }; // Removed database dependency
+    const query = { userId: userId };
     
-    // if (status) {
-    //   query.status = status;
-    // }
+    if (status) {
+      query.status = status;
+    }
     
-    // if (moduleId) {
-    //   query.moduleId = moduleId;
-    // }
+    if (moduleId) {
+      query.moduleId = moduleId;
+    }
 
-    // const calls = await Call.find(query) // Removed database dependency
-    //   .populate('moduleId', 'name type description')
-    //   .sort({ createdAt: -1 })
-    //   .limit(limit * 1)
-    //   .skip((page - 1) * limit);
+    const calls = await Call.find(query)
+      .populate('moduleId', 'name type description')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
 
-    // const total = await Call.countDocuments(query); // Removed database dependency
+    const total = await Call.countDocuments(query);
+
+    // Process calls to include module name
+    const processedCalls = calls.map(call => {
+      const callObj = call.toObject();
+      return {
+        ...callObj,
+        moduleName: callObj.moduleId?.name || 'Unknown Module'
+      };
+    });
 
     res.json({
       success: true,
-      calls: [], // Placeholder for calls
+      calls: processedCalls,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: 0, // Placeholder for total
-        pages: 0 // Placeholder for pages
+        total: total,
+        pages: Math.ceil(total / limit)
       }
     });
   } catch (error) {
@@ -575,7 +717,7 @@ router.get('/history', async (req, res) => {
 // Get single call details
 router.get('/:id', async (req, res) => {
   try {
-    const call = activeCalls.get(req.params.id); // Placeholder for call details
+    const call = await Call.findById(req.params.id);
 
     if (!call) {
       return res.status(404).json({ error: 'Call not found' });
@@ -594,6 +736,48 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Manual status update endpoint for testing
+router.post('/:id/status', protect, async (req, res) => {
+  try {
+    const { status, duration } = req.body;
+    const call = await Call.findById(req.params.id);
+
+    if (!call) {
+      return res.status(404).json({ error: 'Call not found' });
+    }
+
+    call.status = status;
+    if (duration) call.duration = parseInt(duration);
+    
+    // Update transcription based on status
+    if (['failed', 'busy', 'no-answer', 'canceled'].includes(status)) {
+      call.transcription = call.transcription.replace(
+        /User: \[Call in progress - responses will be collected\]/g,
+        'User: [Call was cut off - no response collected]'
+      );
+    } else if (status === 'completed') {
+      call.transcription = call.transcription.replace(
+        /User: \[Call in progress - responses will be collected\]/g,
+        'User: [Call completed successfully]'
+      );
+    }
+    
+    await call.save();
+    
+    res.json({
+      success: true,
+      message: 'Call status updated manually',
+      call
+    });
+  } catch (error) {
+    console.error('Manual status update error:', error);
+    res.status(500).json({ 
+      error: 'Failed to update call status',
+      message: error.message 
+    });
+  }
+});
+
 // Health check endpoint
 router.get('/health', (req, res) => {
   try {
@@ -606,6 +790,26 @@ router.get('/health', (req, res) => {
   } catch (error) {
     res.status(500).json({
       status: 'error',
+      error: error.message
+    });
+  }
+});
+
+// Test status webhook endpoint
+router.post('/test-status', (req, res) => {
+  try {
+    console.log('=== Test Status Webhook ===');
+    console.log('Request Body:', req.body);
+    console.log('Request Headers:', req.headers);
+    
+    res.json({
+      success: true,
+      message: 'Status webhook test received',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
       error: error.message
     });
   }

@@ -14,11 +14,12 @@ interface Contact {
 interface ContactUploaderProps {
   onSubmit: (contacts: { name: string; phone: string }[]) => void;
   onClose: () => void;
+  selectedModule?: any;
 }
 
 const CSV_TEMPLATE = "name,phone\nAbhigyan Raj,9234567890\nSandeep Mehta,9876543210";
 
-const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) => {
+const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, selectedModule }) => {
   const { user } = useAuth();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [manualName, setManualName] = useState("");
@@ -139,7 +140,7 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose }) 
 
       const result = await api.initiateCall(
         token,
-        'simple-module',
+        selectedModule?.id || 'simple-module',
         contact.phone,
         contact.name
       );

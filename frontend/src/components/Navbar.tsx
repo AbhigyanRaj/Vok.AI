@@ -51,11 +51,15 @@ const Navbar: React.FC = () => {
       <div className="w-full mx-auto">
         <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-10">
           {/* Parent Div containing all three sections */}
-          <div className="flex items-center justify-between w-full">
+          <div className="flex items-center justify-between w-full py-10">
             {/* Div 1: Logo */}
             <div className="flex">
               <Link to="/" className="flex">
-                <h1 className="text-lg font-bold text-white hover:text-blue-400 transition-colors">Vok.ai</h1>
+                <img 
+                  src="/logo.png" 
+                  alt="Vok.ai" 
+                  className="h-24 w-auto hover:opacity-80 transition-opacity "
+                />
               </Link>
             </div>
 
