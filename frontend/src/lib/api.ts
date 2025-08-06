@@ -1,4 +1,6 @@
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://vok-ai.onrender.com/api'
+  : 'http://localhost:5001/api';
 
 // API service for backend communication
 export const api = {
