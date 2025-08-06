@@ -27,7 +27,7 @@ app.use(helmet());
 // CORS configuration
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://vok-ai.onrender.com', 'https://your-frontend-domain.com'] // Add your frontend domain when deployed
+    ? ['https://vok-ai.onrender.com', 'https://vok-ai.vercel.app'] // Vercel frontend domain
     : ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true,
   optionsSuccessStatus: 200
