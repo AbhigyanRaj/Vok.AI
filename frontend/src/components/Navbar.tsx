@@ -55,7 +55,7 @@ const Navbar: React.FC = () => {
             {/* Div 1: Logo */}
             <div className="flex">
               <Link to="/" className="flex">
-                <h1 className="text-xl font-bold text-white hover:text-blue-400 transition-colors">Vok.ai</h1>
+                <h1 className="text-lg font-bold text-white hover:text-blue-400 transition-colors">Vok.ai</h1>
               </Link>
             </div>
 
@@ -66,7 +66,7 @@ const Navbar: React.FC = () => {
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                       location.pathname === item.path
                         ? "text-blue-400 bg-blue-400/10"
                         : "text-zinc-300 hover:text-white hover:bg-zinc-800/50"
@@ -159,7 +159,7 @@ const Navbar: React.FC = () => {
                     <Link
                       key={item.path}
                       to={item.path}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         location.pathname === item.path
                           ? "text-blue-400 bg-blue-400/10"
                           : "text-zinc-300 hover:text-white hover:bg-zinc-800"
@@ -175,7 +175,7 @@ const Navbar: React.FC = () => {
                 {/* Mobile Buy Tokens Button */}
                 <Link
                   to="/buy-token"
-                  className="flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors text-zinc-300 hover:text-white hover:bg-zinc-800"
+                  className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors text-zinc-300 hover:text-white hover:bg-zinc-800"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <Plus className="w-4 h-4" />
@@ -185,7 +185,7 @@ const Navbar: React.FC = () => {
                 {/* Mobile Token Display */}
                 <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg">
                   <Coins className="w-4 h-4 text-blue-400" />
-                  <span className="text-sm font-medium text-white">
+                  <span className="text-xs font-medium text-white">
                     {userTokens !== null ? userTokens : user.tokens} tokens
                   </span>
                 </div>
@@ -194,7 +194,7 @@ const Navbar: React.FC = () => {
                 <div className="flex items-center justify-between px-3 py-2">
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-zinc-400" />
-                    <span className="text-zinc-300 text-sm">{user.name}</span>
+                    <span className="text-zinc-300 text-xs">{user.name}</span>
                   </div>
                   <button
                     onClick={() => {
@@ -215,7 +215,7 @@ const Navbar: React.FC = () => {
                     setAuthModal('signup');
                     setIsMenuOpen(false);
                   }}
-                  className="text-zinc-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium transition-colors"
+                  className="text-zinc-300 hover:text-white block px-3 py-2 rounded-md text-sm font-medium transition-colors"
                 >
                   Sign Up
                 </Button>
@@ -224,7 +224,7 @@ const Navbar: React.FC = () => {
                     setAuthModal('login');
                     setIsMenuOpen(false);
                   }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white block px-3 py-2 rounded-md text-base font-medium transition-colors"
+                  className="bg-blue-600 hover:bg-blue-700 text-white block px-3 py-2 rounded-md text-sm font-medium transition-colors"
                 >
                   Log In
                 </Button>
@@ -237,10 +237,10 @@ const Navbar: React.FC = () => {
         {/* Auth Modal */}
         <Modal open={!!authModal} onClose={() => setAuthModal(null)}>
           <div className="w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-white mb-4 text-center">{authModal === 'signup' ? 'Sign Up' : 'Log In'}</h2>
+            <h2 className="text-sm sm:text-base md:text-lg font-semibold text-white mb-4 text-center">{authModal === 'signup' ? 'Sign Up' : 'Log In'}</h2>
             <div className="space-y-4">
               <Button
-                className="w-full justify-center bg-white text-black hover:bg-gray-100 border border-white/20 font-semibold py-3 sm:py-4 text-sm sm:text-base"
+                                  className="w-full justify-center bg-white text-black hover:bg-gray-100 border border-white/20 font-semibold py-3 sm:py-4 text-xs sm:text-xs md:text-sm"
                 onClick={handleSignIn}
                 disabled={loading}
               >
@@ -254,7 +254,7 @@ const Navbar: React.FC = () => {
                 </svg>
                 {loading ? 'Signing in...' : 'Continue with Google'}
               </Button>
-              <p className="text-xs sm:text-sm md:text-base text-zinc-400 text-center">
+              <p className="text-xs text-zinc-400 text-center">
                 By continuing, you agree to our Terms of Service and Privacy Policy
               </p>
             </div>
