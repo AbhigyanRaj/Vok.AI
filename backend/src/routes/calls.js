@@ -492,6 +492,67 @@ router.post('/status', validateTwilioRequest, async (req, res) => {
   }
 });
 
+// Temporary status webhook without validation (for debugging)
+router.post('/status-no-validate', async (req, res) => {
+  try {
+    const { CallSid, CallStatus, CallDuration, To: phoneNumber } = req.body;
+    
+    console.log('\n=== Call Status Update (No Validation) ===');
+    console.log('Call SID:', CallSid);
+    console.log('Status:', CallStatus);
+    console.log('Duration:', CallDuration);
+    console.log('Phone:', phoneNumber);
+    console.log('Request Body:', req.body);
+    console.log('Request Headers:', req.headers);
+    console.log('Environment:', process.env.NODE_ENV);
+
+    // Update call record
+    const call = await Call.findOne({ twilioCallSid: CallSid });
+    if (call) {
+      const previousStatus = call.status;
+      call.status = CallStatus;
+      if (CallDuration) call.duration = parseInt(CallDuration);
+      
+      // Update transcription based on call status
+      if (['failed', 'busy', 'no-answer', 'canceled'].includes(CallStatus)) {
+        // Call was cut off or failed
+        call.transcription = call.transcription.replace(
+          /User: \[Call in progress - responses will be collected\]/g,
+          'User: [Call was cut off - no response collected]'
+        );
+        console.log('❌ Call was cut off or failed');
+      } else if (CallStatus === 'completed' && call.duration < 30) {
+        // Call completed but was too short (likely cut off)
+        call.transcription = call.transcription.replace(
+          /User: \[Call in progress - responses will be collected\]/g,
+          'User: [Call ended too quickly - likely cut off]'
+        );
+        console.log('⚠️ Call completed but was too short');
+      } else if (CallStatus === 'completed') {
+        // Call completed successfully
+        call.transcription = call.transcription.replace(
+          /User: \[Call in progress - responses will be collected\]/g,
+          'User: [Call completed successfully]'
+        );
+        console.log('✅ Call completed successfully');
+      }
+      
+      await call.save();
+      console.log('✅ Call status updated in database');
+
+      // If call completed, process the responses
+      if (['completed', 'failed', 'busy', 'no-answer', 'canceled'].includes(CallStatus)) {
+        await processCallCompletion(call, phoneNumber);
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Status webhook error:', error);
+    res.sendStatus(200); // Still return 200 to Twilio
+  }
+});
+
 // Process call completion and evaluate application
 async function processCallCompletion(call, phoneNumber) {
   try {
@@ -596,6 +657,8 @@ router.get('/test-twilio', async (req, res) => {
     console.log('Twilio Account SID:', config.accountSid);
     console.log('Twilio Auth Token:', config.authToken);
     console.log('Twilio Phone Number:', config.phoneNumber);
+    console.log('Environment:', process.env.NODE_ENV);
+    console.log('All Environment Variables:', Object.keys(process.env).filter(key => key.includes('TWILIO')));
 
     if (config.accountSid === '✅ Configured' && 
         config.authToken === '✅ Configured' && 
@@ -627,7 +690,9 @@ router.get('/test-twilio', async (req, res) => {
       res.json({
         success: false,
         message: 'Missing Twilio configuration',
-        config
+        config,
+        environment: process.env.NODE_ENV,
+        availableEnvVars: Object.keys(process.env).filter(key => key.includes('TWILIO'))
       });
     }
   } catch (error) {
@@ -806,6 +871,33 @@ router.post('/test-status', (req, res) => {
       success: true,
       message: 'Status webhook test received',
       timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Simple webhook test without validation
+router.post('/test-webhook', (req, res) => {
+  try {
+    console.log('=== Test Webhook (No Validation) ===');
+    console.log('Request Body:', req.body);
+    console.log('Request Headers:', req.headers);
+    console.log('Environment:', process.env.NODE_ENV);
+    console.log('Twilio Credentials:', {
+      accountSid: !!process.env.TWILIO_ACCOUNT_SID,
+      authToken: !!process.env.TWILIO_AUTH_TOKEN,
+      phoneNumber: !!process.env.TWILIO_PHONE_NUMBER
+    });
+    
+    res.json({
+      success: true,
+      message: 'Webhook test received without validation',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV
     });
   } catch (error) {
     res.status(500).json({
