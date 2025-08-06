@@ -209,10 +209,6 @@ OPENAI_API_KEY=your_openai_key
 
 This project is currently under active development. For questions or collaboration, please reach out to [Abhigyan](https://github.com/AbhigyanRaj).
 
-## License
-
-This project is licensed under the MIT License.
-
 ---
 
 <p align="center">
