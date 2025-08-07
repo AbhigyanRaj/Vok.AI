@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import * as auth from "../lib/auth";
+import { api } from "../lib/api";
 
 interface CallData {
   _id: string;
@@ -80,17 +81,8 @@ const AnalyticsPage: React.FC = () => {
         return;
       }
 
-      // Fetch call history from backend
-      const response = await fetch(`${process.env.NODE_ENV === 'production' 
-        ? 'https://vok-ai.onrender.com/api'
-        : 'http://localhost:5001/api'}/calls/history`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
+      // Fetch call history from backend using the API service
+      const data = await api.getCallHistory(token);
       
       if (!data.success) {
         setError("Failed to fetch analytics data");

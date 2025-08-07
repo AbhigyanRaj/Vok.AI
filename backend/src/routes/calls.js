@@ -98,11 +98,11 @@ router.post('/initiate', protect, async (req, res) => {
     const publicUrl = process.env.NGROK_URL || process.env.BASE_URL;
     let call; // Declare call variable outside the if/else blocks
     
-    try {
-      if (publicUrl && !publicUrl.includes('localhost')) {
-        // Use webhook for interactive flow
-        console.log('📞 Using webhook flow with public URL:', publicUrl);
-        
+    if (publicUrl && !publicUrl.includes('localhost')) {
+      // Use webhook for interactive flow
+      console.log('📞 Using webhook flow with public URL:', publicUrl);
+      
+      try {
         const webhookUrl = new URL(`${publicUrl}/api/calls/handle-call`);
         webhookUrl.searchParams.set('moduleId', moduleId);
         webhookUrl.searchParams.set('customerName', customerName);
@@ -127,10 +127,36 @@ router.post('/initiate', protect, async (req, res) => {
           machineDetection: 'DetectMessageEnd',
           machineDetectionTimeout: 30
         });
-          } else {
-        // Fallback to simple TwiML for local development
-        console.log('📞 Using simple TwiML flow for local development');
+      } catch (twilioError) {
+        console.error('❌ Twilio call creation error:', twilioError);
         
+        // Handle specific Twilio trial account errors
+        if (twilioError.code === 21211 || twilioError.message?.includes('unverified')) {
+          return res.status(400).json({
+            error: 'Trial account limitation',
+            message: `The number ${formattedPhone} is unverified. Trial accounts may only make calls to verified numbers. Please verify this number in your Twilio console or upgrade to a paid account.`,
+            code: 'UNVERIFIED_NUMBER',
+            suggestion: 'To verify numbers, go to Twilio Console > Phone Numbers > Verified Caller IDs'
+          });
+        }
+        
+        // Handle other Twilio errors
+        if (twilioError.code === 21214) {
+          return res.status(400).json({
+            error: 'Invalid phone number',
+            message: 'The phone number format is invalid. Please check the number and try again.',
+            code: 'INVALID_NUMBER'
+          });
+        }
+        
+        // Re-throw other errors
+        throw twilioError;
+      }
+    } else {
+      // Fallback to simple TwiML for local development
+      console.log('📞 Using simple TwiML flow for local development');
+      
+      try {
         const twiml = new twilio.twiml.VoiceResponse();
         
         // Create a simple call flow for testing
@@ -164,31 +190,32 @@ router.post('/initiate', protect, async (req, res) => {
           statusCallbackMethod: 'POST',
           timeout: 120
         });
+      } catch (twilioError) {
+        console.error('❌ Twilio call creation error:', twilioError);
+        
+        // Handle specific Twilio trial account errors
+        if (twilioError.code === 21211 || twilioError.message?.includes('unverified')) {
+          return res.status(400).json({
+            error: 'Trial account limitation',
+            message: `The number ${formattedPhone} is unverified. Trial accounts may only make calls to verified numbers. Please verify this number in your Twilio console or upgrade to a paid account.`,
+            code: 'UNVERIFIED_NUMBER',
+            suggestion: 'To verify numbers, go to Twilio Console > Phone Numbers > Verified Caller IDs'
+          });
+        }
+        
+        // Handle other Twilio errors
+        if (twilioError.code === 21214) {
+          return res.status(400).json({
+            error: 'Invalid phone number',
+            message: 'The phone number format is invalid. Please check the number and try again.',
+            code: 'INVALID_NUMBER'
+          });
+        }
+        
+        // Re-throw other errors
+        throw twilioError;
       }
-    } catch (twilioError) {
-      console.error('❌ Twilio call creation error:', twilioError);
-      
-      // Handle specific Twilio trial account errors
-      if (twilioError.code === 21211 || twilioError.message?.includes('unverified')) {
-        return res.status(400).json({
-          error: 'Trial account limitation',
-          message: `The number ${formattedPhone} is unverified. Trial accounts may only make calls to verified numbers. Please verify this number in your Twilio console or upgrade to a paid account.`,
-          code: 'UNVERIFIED_NUMBER',
-          suggestion: 'To verify numbers, go to Twilio Console > Phone Numbers > Verified Caller IDs'
-        });
-      }
-      
-      // Handle other Twilio errors
-      if (twilioError.code === 21214) {
-        return res.status(400).json({
-          error: 'Invalid phone number',
-          message: 'The phone number format is invalid. Please check the number and try again.',
-          code: 'INVALID_NUMBER'
-        });
-      }
-      
-      // Re-throw other errors
-      throw twilioError;
+    
     }
 
     console.log('✅ REAL call initiated!');

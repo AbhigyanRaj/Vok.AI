@@ -37,6 +37,37 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/health`);
     return response.json();
   },
+
+  // Get call history - AUTH REQUIRED
+  async getCallHistory(token: string, page = 1, limit = 20, status?: string, moduleId?: string) {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    if (status) params.append('status', status);
+    if (moduleId) params.append('moduleId', moduleId);
+
+    const response = await fetch(`${API_BASE_URL}/calls/history?${params}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    return response.json();
+  },
+
+  // Get user analytics - AUTH REQUIRED
+  async getUserAnalytics(token: string) {
+    const response = await fetch(`${API_BASE_URL}/users/analytics`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    return response.json();
+  },
 };
 
 // Token management (keeping for future use)
