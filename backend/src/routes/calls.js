@@ -98,71 +98,97 @@ router.post('/initiate', protect, async (req, res) => {
     const publicUrl = process.env.NGROK_URL || process.env.BASE_URL;
     let call; // Declare call variable outside the if/else blocks
     
-    if (publicUrl && !publicUrl.includes('localhost')) {
-      // Use webhook for interactive flow
-      console.log('📞 Using webhook flow with public URL:', publicUrl);
-      
-      const webhookUrl = new URL(`${publicUrl}/api/calls/handle-call`);
-      webhookUrl.searchParams.set('moduleId', moduleId);
-      webhookUrl.searchParams.set('customerName', customerName);
-      webhookUrl.searchParams.set('phoneNumber', formattedPhone);
-      webhookUrl.searchParams.set('step', '0');
+    try {
+      if (publicUrl && !publicUrl.includes('localhost')) {
+        // Use webhook for interactive flow
+        console.log('📞 Using webhook flow with public URL:', publicUrl);
+        
+        const webhookUrl = new URL(`${publicUrl}/api/calls/handle-call`);
+        webhookUrl.searchParams.set('moduleId', moduleId);
+        webhookUrl.searchParams.set('customerName', customerName);
+        webhookUrl.searchParams.set('phoneNumber', formattedPhone);
+        webhookUrl.searchParams.set('step', '0');
 
-      const statusCallbackUrl = new URL(`${publicUrl}/api/calls/status`);
-      
-      call = await twilioClient.calls.create({
-        method: 'POST',
-        url: webhookUrl.toString(),
-        to: formattedPhone,
-        from: process.env.TWILIO_PHONE_NUMBER,
-        statusCallback: statusCallbackUrl.toString(),
-        statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-        statusCallbackMethod: 'POST',
-        // Add timeout to prevent hanging calls
-        timeout: 120, // 2 minutes max call duration
-        // Add recording for debugging
-        record: false,
-        // Add machine detection with valid parameters only
-        machineDetection: 'DetectMessageEnd',
-        machineDetectionTimeout: 30
-      });
-    } else {
-      // Fallback to simple TwiML for local development
-      console.log('📞 Using simple TwiML flow for local development');
-      
-      const twiml = new twilio.twiml.VoiceResponse();
-      
-      // Create a simple call flow for testing
-      twiml.say(`Hello ${customerName}, this is a call from Vok.AI. We have a few questions for you.`, {
-        voice: 'Polly.Aditi'
-      });
-      twiml.pause({ length: 1 });
-      
-      // Ask all questions from the module
-      if (module.questions && module.questions.length > 0) {
-        module.questions.forEach((question, index) => {
-          twiml.say(`Question ${index + 1}: ${question.question}`, { voice: 'Polly.Aditi' });
-          twiml.pause({ length: 3 }); // Give time for response
+        const statusCallbackUrl = new URL(`${publicUrl}/api/calls/status`);
+        
+        call = await twilioClient.calls.create({
+          method: 'POST',
+          url: webhookUrl.toString(),
+          to: formattedPhone,
+          from: process.env.TWILIO_PHONE_NUMBER,
+          statusCallback: statusCallbackUrl.toString(),
+          statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+          statusCallbackMethod: 'POST',
+          // Add timeout to prevent hanging calls
+          timeout: 120, // 2 minutes max call duration
+          // Add recording for debugging
+          record: false,
+          // Add machine detection with valid parameters only
+          machineDetection: 'DetectMessageEnd',
+          machineDetectionTimeout: 30
         });
-        twiml.say('Thank you for answering all our questions. Have a great day!', { voice: 'Polly.Aditi' });
-      } else {
-        twiml.say('Thank you for taking our call. Have a great day!', { voice: 'Polly.Aditi' });
+          } else {
+        // Fallback to simple TwiML for local development
+        console.log('📞 Using simple TwiML flow for local development');
+        
+        const twiml = new twilio.twiml.VoiceResponse();
+        
+        // Create a simple call flow for testing
+        twiml.say(`Hello ${customerName}, this is a call from Vok.AI. We have a few questions for you.`, {
+          voice: 'Polly.Aditi'
+        });
+        twiml.pause({ length: 1 });
+        
+        // Ask all questions from the module
+        if (module.questions && module.questions.length > 0) {
+          module.questions.forEach((question, index) => {
+            twiml.say(`Question ${index + 1}: ${question.question}`, { voice: 'Polly.Aditi' });
+            twiml.pause({ length: 3 }); // Give time for response
+          });
+          twiml.say('Thank you for answering all our questions. Have a great day!', { voice: 'Polly.Aditi' });
+        } else {
+          twiml.say('Thank you for taking our call. Have a great day!', { voice: 'Polly.Aditi' });
+        }
+        
+        twiml.hangup();
+        
+        // Create status callback URL for local development
+        const statusCallbackUrl = new URL(`${process.env.BASE_URL}/api/calls/status`);
+        
+        call = await twilioClient.calls.create({
+          twiml: twiml.toString(),
+          to: formattedPhone,
+          from: process.env.TWILIO_PHONE_NUMBER,
+          statusCallback: statusCallbackUrl.toString(),
+          statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed', 'failed', 'busy', 'no-answer', 'canceled'],
+          statusCallbackMethod: 'POST',
+          timeout: 120
+        });
+      }
+    } catch (twilioError) {
+      console.error('❌ Twilio call creation error:', twilioError);
+      
+      // Handle specific Twilio trial account errors
+      if (twilioError.code === 21211 || twilioError.message?.includes('unverified')) {
+        return res.status(400).json({
+          error: 'Trial account limitation',
+          message: `The number ${formattedPhone} is unverified. Trial accounts may only make calls to verified numbers. Please verify this number in your Twilio console or upgrade to a paid account.`,
+          code: 'UNVERIFIED_NUMBER',
+          suggestion: 'To verify numbers, go to Twilio Console > Phone Numbers > Verified Caller IDs'
+        });
       }
       
-      twiml.hangup();
+      // Handle other Twilio errors
+      if (twilioError.code === 21214) {
+        return res.status(400).json({
+          error: 'Invalid phone number',
+          message: 'The phone number format is invalid. Please check the number and try again.',
+          code: 'INVALID_NUMBER'
+        });
+      }
       
-      // Create status callback URL for local development
-      const statusCallbackUrl = new URL(`${process.env.BASE_URL}/api/calls/status`);
-      
-      call = await twilioClient.calls.create({
-        twiml: twiml.toString(),
-        to: formattedPhone,
-        from: process.env.TWILIO_PHONE_NUMBER,
-        statusCallback: statusCallbackUrl.toString(),
-        statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed', 'failed', 'busy', 'no-answer', 'canceled'],
-        statusCallbackMethod: 'POST',
-        timeout: 120
-      });
+      // Re-throw other errors
+      throw twilioError;
     }
 
     console.log('✅ REAL call initiated!');

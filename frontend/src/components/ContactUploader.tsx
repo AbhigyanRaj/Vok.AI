@@ -163,6 +163,21 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
           return false;
         }
         
+        // Handle trial account limitation
+        if (result.error === 'Trial account limitation' || result.code === 'UNVERIFIED_NUMBER') {
+          setError(`Call failed: ${result.message}`);
+          if (result.suggestion) {
+            setError(prev => prev + '\n\n' + result.suggestion);
+          }
+          return false;
+        }
+        
+        // Handle invalid phone number
+        if (result.error === 'Invalid phone number' || result.code === 'INVALID_NUMBER') {
+          setError(`Call failed: ${result.message}`);
+          return false;
+        }
+        
         setError(`Call failed: ${result.message || result.error}`);
         return false;
       }
