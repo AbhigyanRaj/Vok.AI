@@ -49,22 +49,61 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  const getDemoUrl = (voiceId: string) => `/api/voices/sample?voice=${voiceId}`;
 
   const playDemo = async (voiceId: string) => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+    if (playingVoice === voiceId) {
+      setPlayingVoice(null); // Stop playing if already playing
+      return;
     }
     setPlayingVoice(voiceId);
-    const demoUrl = getDemoUrl(voiceId);
-    const audio = new window.Audio(demoUrl);
-    audioRef.current = audio;
-    audio.play();
-    audio.onended = () => setPlayingVoice(null);
-    audio.onerror = () => setPlayingVoice(null);
+    
+    // Use browser's built-in speech synthesis for demo
+    if ('speechSynthesis' in window) {
+      // Ensure voices are loaded
+      let voices = speechSynthesis.getVoices();
+      if (voices.length === 0) {
+        // Wait for voices to load
+        speechSynthesis.onvoiceschanged = () => {
+          voices = speechSynthesis.getVoices();
+          speakDemo(voiceId, voices);
+        };
+        return;
+      }
+      
+      speakDemo(voiceId, voices);
+    } else {
+      // Fallback: just show loading state briefly
+      setTimeout(() => setPlayingVoice(null), 1000);
+    }
+  };
+
+  const speakDemo = (voiceId: string, voices: SpeechSynthesisVoice[]) => {
+    const utterance = new SpeechSynthesisUtterance(`Hello, this is ${ELEVENLABS_FREE_VOICES.find(v => v.id === voiceId)?.name} from Vok.AI!`);
+    
+    // Set voice properties to match the selected voice
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 0.8;
+    
+    // Find a voice that sounds similar (English, female for Rachel/Bella/Domi, male for Antoni/Thomas/Josh)
+    const targetVoice = voices.find(voice => {
+      const isEnglish = voice.lang.startsWith('en');
+      const isFemale = voiceId === 'RACHEL' || voiceId === 'BELLA' || voiceId === 'DOMI';
+      const isMale = voiceId === 'ANTONI' || voiceId === 'THOMAS' || voiceId === 'JOSH';
+      
+      if (isFemale) return isEnglish && voice.name.toLowerCase().includes('female');
+      if (isMale) return isEnglish && voice.name.toLowerCase().includes('male');
+      return isEnglish;
+    }) || voices.find(voice => voice.lang.startsWith('en')) || null;
+    
+    if (targetVoice) {
+      utterance.voice = targetVoice;
+    }
+    
+    utterance.onend = () => setPlayingVoice(null);
+    utterance.onerror = () => setPlayingVoice(null);
+    
+    speechSynthesis.speak(utterance);
   };
 
   // Fetch token information on component mount
