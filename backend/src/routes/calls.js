@@ -15,6 +15,7 @@ import User from '../models/User.js';
 import Module from '../models/Module.js';
 import Call from '../models/Call.js';
 import { protect } from '../middleware/auth.js';
+import path from 'path'; // Added for serving audio files
 
 const router = express.Router();
 
@@ -1399,6 +1400,34 @@ router.get('/test-elevenlabs-status', async (req, res) => {
       error: error.message,
       apiKeyStatus: process.env.ELEVENLABS_API_KEY ? 'Loaded' : 'Not loaded'
     });
+  }
+});
+
+// Serve a short demo audio for a given voice (cached)
+router.get('/voices/sample', async (req, res) => {
+  try {
+    const voiceId = req.query.voice || 'RACHEL';
+    const voiceName = {
+      RACHEL: 'Rachel',
+      DOMI: 'Domi',
+      BELLA: 'Bella',
+      ANTONI: 'Antoni',
+      THOMAS: 'Thomas',
+      JOSH: 'Josh',
+    }[voiceId] || 'Rachel';
+    const sampleText = `Hello, this is ${voiceName} from Vok.AI!`;
+    // Use a special audioType for caching
+    const result = await generateAndSaveAudioWithFallback(sampleText, voiceId, 'voice_sample');
+    if (result.fallback || !result.audioUrl) {
+      return res.status(500).json({ error: 'Failed to generate sample audio.' });
+    }
+    // Serve the MP3 file directly
+    const filePath = result.audioUrl.replace(/^.*\/audio\//, path.join(__dirname, '../audio/'));
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.sendFile(filePath);
+  } catch (error) {
+    console.error('Error generating voice sample:', error);
+    res.status(500).json({ error: 'Failed to generate voice sample.' });
   }
 });
 

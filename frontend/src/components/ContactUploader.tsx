@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Upload, Phone, User, X, Check } from "lucide-react";
 import * as auth from "../lib/auth";
@@ -19,6 +19,16 @@ interface ContactUploaderProps {
 
 const CSV_TEMPLATE = "name,phone\nAbhigyan Raj,9234567890\nSandeep Mehta,9876543210";
 
+// List of free ElevenLabs voices
+const ELEVENLABS_FREE_VOICES = [
+  { id: 'RACHEL', name: 'Rachel', gender: 'Female', demo: 'https://cdn.elevenlabs.io/samples/21m00Tcm4TlvDq8ikWAM.mp3' },
+  { id: 'DOMI', name: 'Domi', gender: 'Female', demo: 'https://cdn.elevenlabs.io/samples/AZnzlk1XvdvUeBnXmlld.mp3' },
+  { id: 'BELLA', name: 'Bella', gender: 'Female', demo: 'https://cdn.elevenlabs.io/samples/EXAVITQu4vr4xnSDxMaL.mp3' },
+  { id: 'ANTONI', name: 'Antoni', gender: 'Male', demo: 'https://cdn.elevenlabs.io/samples/ErXwobaYiN019PkySvjV.mp3' },
+  { id: 'THOMAS', name: 'Thomas', gender: 'Male', demo: 'https://cdn.elevenlabs.io/samples/GBv7mTt0atIp3Br8iCZE.mp3' },
+  { id: 'JOSH', name: 'Josh', gender: 'Male', demo: 'https://cdn.elevenlabs.io/samples/TxGEqnHWrfWFTfGW9XjX.mp3' },
+];
+
 const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, selectedModule }) => {
   const { user } = useAuth();
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -35,6 +45,27 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
     currentBalance: number;
     canMakeCall: boolean;
   } | null>(null);
+  const [selectedVoice, setSelectedVoice] = useState('RACHEL');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [playingVoice, setPlayingVoice] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const getDemoUrl = (voiceId: string) => `/api/voices/sample?voice=${voiceId}`;
+
+  const playDemo = async (voiceId: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setPlayingVoice(voiceId);
+    const demoUrl = getDemoUrl(voiceId);
+    const audio = new window.Audio(demoUrl);
+    audioRef.current = audio;
+    audio.play();
+    audio.onended = () => setPlayingVoice(null);
+    audio.onerror = () => setPlayingVoice(null);
+  };
 
   // Fetch token information on component mount
   React.useEffect(() => {
@@ -60,6 +91,25 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
 
     fetchTokenInfo();
   }, []);
+
+  // Close dropdown on outside click or ESC
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [dropdownOpen]);
 
   // Minimal CSV parser: expects header row with 'name' and 'phone' columns
   const parseCSV = (csv: string) => {
@@ -138,11 +188,13 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
         return false;
       }
 
+      // Pass selectedVoice to backend (even if ignored for now)
       const result = await api.initiateCall(
         token,
         selectedModule?.id || 'simple-module',
         contact.phone,
-        contact.name
+        contact.name,
+        selectedVoice // <-- pass as extra param (backend can ignore)
       );
 
       if (result.success) {
@@ -290,6 +342,60 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
           )}
         </div>
       )}
+
+      {/* Minimal Custom Dropdown for Voice Selection - moved above CSV upload */}
+      <div className="flex flex-col gap-1 relative z-10" ref={dropdownRef}>
+        <label className="text-sm text-white/80 font-medium mb-1">Choose Voice Model:</label>
+        <button
+          type="button"
+          className="flex items-center justify-between w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-400/30"
+          onClick={() => setDropdownOpen((open) => !open)}
+          aria-haspopup="listbox"
+          aria-expanded={dropdownOpen}
+        >
+          <span className="flex items-center gap-2">
+            <span className="font-semibold">{ELEVENLABS_FREE_VOICES.find(v => v.id === selectedVoice)?.name}</span>
+            <span className="text-xs text-zinc-400">({ELEVENLABS_FREE_VOICES.find(v => v.id === selectedVoice)?.gender})</span>
+          </span>
+          <svg className={`w-4 h-4 ml-2 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+        </button>
+        {dropdownOpen && (
+          <ul
+            className="absolute left-0 right-0 mt-1 bg-zinc-900 border border-zinc-700 rounded shadow-lg max-h-56 overflow-y-auto z-20 p-0"
+            tabIndex={-1}
+            role="listbox"
+          >
+            {ELEVENLABS_FREE_VOICES.map(v => (
+              <li
+                key={v.id}
+                className={`flex items-center justify-between px-3 py-1 cursor-pointer text-sm transition-colors ${selectedVoice === v.id ? 'bg-blue-950/40 text-blue-300' : 'hover:bg-zinc-800 text-white/90'}`}
+                onClick={() => { setSelectedVoice(v.id); setDropdownOpen(false); }}
+                role="option"
+                aria-selected={selectedVoice === v.id}
+                tabIndex={0}
+              >
+                <span className="flex items-center gap-2">
+                  <span>{v.name}</span>
+                  <span className="text-xs text-zinc-400">({v.gender})</span>
+                </span>
+                <button
+                  type="button"
+                  className="ml-2 p-1 rounded-full hover:bg-blue-900/30 focus:outline-none"
+                  onClick={e => { e.stopPropagation(); playDemo(v.id); }}
+                  disabled={playingVoice === v.id}
+                  aria-label={`Play sample for ${v.name}`}
+                >
+                  {playingVoice === v.id ? (
+                    <svg className="animate-spin w-4 h-4 text-blue-400" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+                  ) : (
+                    <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path d="M6 4l12 6-12 6V4z" /></svg>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
         <label className="text-sm text-white/80 font-medium">Upload CSV (name, phone):</label>
