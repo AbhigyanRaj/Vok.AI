@@ -18,6 +18,141 @@ import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Configuration - Smart Hybrid System
+const HYBRID_CONFIG = {
+  // ElevenLabs usage limits to prevent abuse detection
+  MAX_ELEVENLABS_PER_CALL: 3,
+  MAX_ELEVENLABS_PER_MINUTE: 5,
+  MAX_ELEVENLABS_PER_HOUR: 20,
+  
+  // Priority system for ElevenLabs usage
+  PRIORITY: {
+    HIGH: ['greeting', 'first_question', 'outro'], // Always try ElevenLabs
+    MEDIUM: ['key_questions'], // Try ElevenLabs if within limits
+    LOW: ['confirmation', 'decline', 'final'] // Use Twilio TTS
+  },
+  
+  // Voice settings
+  ELEVENLABS_VOICE: 'RACHEL',
+  TWILIO_VOICE: 'Polly.Aditi',
+  TWILIO_LANGUAGE: 'en-IN'
+};
+
+// Track ElevenLabs usage for rate limiting
+let elevenLabsUsage = {
+  perCall: new Map(),
+  perMinute: { count: 0, resetTime: Date.now() + 60000 },
+  perHour: { count: 0, resetTime: Date.now() + 3600000 }
+};
+
+// Smart function to determine if we should use ElevenLabs
+function shouldUseElevenLabs(audioType, callId) {
+  // Reset counters if time has passed
+  const now = Date.now();
+  if (now > elevenLabsUsage.perMinute.resetTime) {
+    elevenLabsUsage.perMinute = { count: 0, resetTime: now + 60000 };
+  }
+  if (now > elevenLabsUsage.perHour.resetTime) {
+    elevenLabsUsage.perHour = { count: 0, resetTime: now + 3600000 };
+  }
+  
+  // Check if we've hit any limits
+  const callUsage = elevenLabsUsage.perCall.get(callId) || 0;
+  if (callUsage >= HYBRID_CONFIG.MAX_ELEVENLABS_PER_CALL) {
+    console.log(`🚫 ElevenLabs limit reached for call ${callId} (${callUsage}/${HYBRID_CONFIG.MAX_ELEVENLABS_PER_CALL})`);
+    return false;
+  }
+  
+  if (elevenLabsUsage.perMinute.count >= HYBRID_CONFIG.MAX_ELEVENLABS_PER_MINUTE) {
+    console.log(`🚫 ElevenLabs minute limit reached (${elevenLabsUsage.perMinute.count}/${HYBRID_CONFIG.MAX_ELEVENLABS_PER_MINUTE})`);
+    return false;
+  }
+  
+  if (elevenLabsUsage.perHour.count >= HYBRID_CONFIG.MAX_ELEVENLABS_PER_HOUR) {
+    console.log(`🚫 ElevenLabs hour limit reached (${elevenLabsUsage.perHour.count}/${HYBRID_CONFIG.MAX_ELEVENLABS_PER_HOUR})`);
+    return false;
+  }
+  
+  // Check priority
+  const isHighPriority = HYBRID_CONFIG.PRIORITY.HIGH.includes(audioType);
+  const isMediumPriority = HYBRID_CONFIG.PRIORITY.MEDIUM.includes(audioType);
+  const isLowPriority = HYBRID_CONFIG.PRIORITY.LOW.includes(audioType);
+  
+  // Always use ElevenLabs for high priority
+  if (isHighPriority) {
+    console.log(`🎯 High priority audio type: ${audioType} - Using ElevenLabs`);
+    return true;
+  }
+  
+  // Use ElevenLabs for medium priority if we have room
+  if (isMediumPriority && callUsage < 2) {
+    console.log(`🎯 Medium priority audio type: ${audioType} - Using ElevenLabs (call usage: ${callUsage})`);
+    return true;
+  }
+  
+  // Use Twilio for low priority
+  if (isLowPriority) {
+    console.log(`🎯 Low priority audio type: ${audioType} - Using Twilio TTS`);
+    return false;
+  }
+  
+  // Default to Twilio for unknown types
+  console.log(`🎯 Unknown audio type: ${audioType} - Using Twilio TTS`);
+  return false;
+}
+
+// Function to record ElevenLabs usage
+function recordElevenLabsUsage(callId) {
+  const callUsage = (elevenLabsUsage.perCall.get(callId) || 0) + 1;
+  elevenLabsUsage.perCall.set(callId, callUsage);
+  elevenLabsUsage.perMinute.count++;
+  elevenLabsUsage.perHour.count++;
+  
+  console.log(`📊 ElevenLabs usage recorded - Call: ${callUsage}, Minute: ${elevenLabsUsage.perMinute.count}, Hour: ${elevenLabsUsage.perHour.count}`);
+}
+
+// Smart hybrid audio generation function
+async function generateSmartAudio(text, audioType, callId, twimlResponse) {
+  console.log(`🎤 Smart audio generation for: ${audioType}`);
+  
+  // Check if we should use ElevenLabs
+  if (shouldUseElevenLabs(audioType, callId)) {
+    try {
+      console.log(`🎤 Attempting ElevenLabs for ${audioType}...`);
+      const audio = await generateAndSaveAudioWithFallback(
+        text, 
+        HYBRID_CONFIG.ELEVENLABS_VOICE, 
+        audioType
+      );
+      
+      if (audio.fallback) {
+        console.log(`⚠️ ElevenLabs failed for ${audioType}, using Twilio TTS`);
+        twimlResponse.say(text, { 
+          voice: HYBRID_CONFIG.TWILIO_VOICE,
+          language: HYBRID_CONFIG.TWILIO_LANGUAGE
+        });
+      } else {
+        console.log(`✅ ElevenLabs successful for ${audioType}`);
+        twimlResponse.play(audio.audioUrl);
+        recordElevenLabsUsage(callId);
+      }
+    } catch (error) {
+      console.log(`❌ ElevenLabs failed for ${audioType}, using Twilio TTS fallback`);
+      twimlResponse.say(text, { 
+        voice: HYBRID_CONFIG.TWILIO_VOICE,
+        language: HYBRID_CONFIG.TWILIO_LANGUAGE
+      });
+    }
+  } else {
+    // Use Twilio TTS directly
+    console.log(`🎤 Using Twilio TTS for ${audioType}`);
+    twimlResponse.say(text, { 
+      voice: HYBRID_CONFIG.TWILIO_VOICE,
+      language: HYBRID_CONFIG.TWILIO_LANGUAGE
+    });
+  }
+}
+
 // Track active calls (in memory - in production, use Redis)
 const activeCalls = new Map();
 
@@ -231,8 +366,8 @@ router.post('/initiate', protect, async (req, res) => {
         throw twilioError;
       }
     } else {
-      // Fallback to simple TwiML for local development - FIXED VERSION
-      console.log('📞 Using simple TwiML flow for local development');
+      // Fallback to simple TwiML for local development - HYBRID VERSION
+      console.log('📞 Using smart hybrid TwiML flow for local development');
       
       try {
         const twiml = new twilio.twiml.VoiceResponse();
@@ -240,30 +375,47 @@ router.post('/initiate', protect, async (req, res) => {
         // Get questions from module
         const questions = module.questions.sort((a, b) => a.order - b.order);
         
-        // Start with greeting using Twilio TTS (reliable fallback)
-        twiml.say(`Hello ${customerName}, this is a call from Vok.AI. We have a few questions for you.`, { 
-          voice: 'Polly.Aditi',
-          language: 'en-IN'
-        });
+        // Generate unique call ID for tracking
+        const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Use smart hybrid for greeting (HIGH PRIORITY)
+        await generateSmartAudio(
+          `Hello ${customerName}, this is a call from Vok.AI. We have a few questions for you.`,
+          'greeting',
+          callId,
+          twiml
+        );
+        
         twiml.pause({ length: 1 });
         
-        // Ask all questions from the module using Twilio TTS
+        // Ask all questions from the module using smart hybrid
         if (questions && questions.length > 0) {
           for (const [index, question] of questions.entries()) {
-            twiml.say(`Question ${index + 1}: ${question.question}`, { 
-              voice: 'Polly.Aditi',
-              language: 'en-IN'
-            });
+            // Determine audio type based on question importance
+            const audioType = index === 0 ? 'first_question' : 'key_questions';
+            
+            await generateSmartAudio(
+              `Question ${index + 1}: ${question.question}`,
+              audioType,
+              callId,
+              twiml
+            );
+            
             twiml.pause({ length: 3 }); // Give time for response
           }
-          twiml.say('Thank you for answering all our questions. Have a great day!', { 
-            voice: 'Polly.Aditi',
-            language: 'en-IN'
-          });
+          
+          // Use smart hybrid for outro (HIGH PRIORITY)
+          await generateSmartAudio(
+            'Thank you for answering all our questions. Have a great day!',
+            'outro',
+            callId,
+            twiml
+          );
         } else {
+          // Use Twilio TTS for simple message
           twiml.say('Thank you for taking our call. Have a great day!', { 
-            voice: 'Polly.Aditi',
-            language: 'en-IN'
+            voice: HYBRID_CONFIG.TWILIO_VOICE,
+            language: HYBRID_CONFIG.TWILIO_LANGUAGE
           });
         }
         
@@ -440,20 +592,27 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
 
     // Handle different steps of the call
     if (step === 0) {
-      // Initial greeting - Use reliable Twilio TTS
+      // Initial greeting - Use smart hybrid system
       console.log('Starting new call flow (step 0)');
       
-      twimlResponse.say(`Hi ${customerName}, we are from VokAI. Is it the right time to speak to you about our questions?`, { 
-        voice: 'Polly.Aditi',
-        language: 'en-IN'
-      });
+      // Generate call ID for tracking
+      const callId = `webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Use smart hybrid for greeting (HIGH PRIORITY)
+      await generateSmartAudio(
+        `Hi ${customerName}, we are from VokAI. Is it the right time to speak to you about our questions?`,
+        'greeting',
+        callId,
+        twimlResponse
+      );
 
       const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
       nextUrl.searchParams.set('moduleId', moduleId);
       nextUrl.searchParams.set('customerName', customerName);
       nextUrl.searchParams.set('step', '1');
       nextUrl.searchParams.set('phoneNumber', phoneNumber);
-      nextUrl.searchParams.set('voiceType', voiceType); // Pass voiceType to next step
+      nextUrl.searchParams.set('voiceType', voiceType);
+      nextUrl.searchParams.set('callId', callId); // Pass callId for tracking
 
       console.log('Next URL for step 1:', nextUrl.toString());
 
@@ -467,16 +626,22 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
 
     } else if (step === 1) {
       // Check if customer confirmed availability
+      const callId = req.query.callId || req.body.callId || `webhook_${Date.now()}`;
+      
       if (previousResponse && ['yes', 'okay', 'sure', 'go ahead', 'yeah', 'hmm', 'uh huh'].some(word => 
         previousResponse.toLowerCase().includes(word))) {
         
         console.log('\n✅ CUSTOMER CONFIRMED AVAILABILITY!');
         console.log('🎯 Moving to questions...');
         
-        twimlResponse.say(`Great! Let me ask you a few questions.`, { 
-          voice: 'Polly.Aditi',
-          language: 'en-IN'
-        });
+        // Use smart hybrid for confirmation (LOW PRIORITY - will use Twilio)
+        await generateSmartAudio(
+          'Great! Let me ask you a few questions.',
+          'confirmation',
+          callId,
+          twimlResponse
+        );
+        
         twimlResponse.pause({ length: 0.5 });
 
         const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
@@ -484,7 +649,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         nextUrl.searchParams.set('customerName', customerName);
         nextUrl.searchParams.set('step', '2');
         nextUrl.searchParams.set('phoneNumber', phoneNumber);
-        nextUrl.searchParams.set('voiceType', voiceType); // Pass voiceType to next step
+        nextUrl.searchParams.set('voiceType', voiceType);
+        nextUrl.searchParams.set('callId', callId);
 
         const gather = twimlResponse.gather({
           input: 'speech',
@@ -493,19 +659,27 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           method: 'POST',
           speechTimeout: 'auto'
         });
-        gather.say(questions[0].question, { 
-          voice: 'Polly.Aditi',
-          language: 'en-IN'
-        });
+        
+        // Use smart hybrid for the first question (HIGH PRIORITY)
+        await generateSmartAudio(
+          questions[0].question,
+          'first_question',
+          callId,
+          gather
+        );
 
       } else {
         console.log('\n❌ CUSTOMER DECLINED OR NO RESPONSE');
         console.log('📞 Ending call...');
         
-        twimlResponse.say("I understand this isn't a good time. We'll call you back later. Thank you!", { 
-          voice: 'Polly.Aditi',
-          language: 'en-IN'
-        });
+        // Use smart hybrid for decline message (LOW PRIORITY - will use Twilio)
+        await generateSmartAudio(
+          "I understand this isn't a good time. We'll call you back later. Thank you!",
+          'decline',
+          callId,
+          twimlResponse
+        );
+        
         twimlResponse.hangup();
 
         // Update call status
@@ -519,6 +693,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
     } else if (step < questions.length + 2) {
       // Handle question responses
       const questionIndex = step - 2;
+      const callId = req.query.callId || req.body.callId || `webhook_${Date.now()}`;
       
       // Store previous response if available
       if (previousResponse && phoneNumber && call) {
@@ -559,15 +734,25 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       if (questionIndex >= questions.length) {
         // End of questions - play outro
         console.log('End of questions reached, playing outro...');
-        twimlResponse.say('Thank you for providing the information. We have recorded all your responses.', { 
-          voice: 'Polly.Aditi',
-          language: 'en-IN'
-        });
+        
+        // Use smart hybrid for outro (HIGH PRIORITY)
+        await generateSmartAudio(
+          'Thank you for providing the information. We have recorded all your responses.',
+          'outro',
+          callId,
+          twimlResponse
+        );
+        
         twimlResponse.pause({ length: 0.5 });
-        twimlResponse.say('Our team will review your responses. Have a great day!', { 
-          voice: 'Polly.Aditi',
-          language: 'en-IN'
-        });
+        
+        // Use smart hybrid for final message (LOW PRIORITY - will use Twilio)
+        await generateSmartAudio(
+          'Our team will review your responses. Have a great day!',
+          'final',
+          callId,
+          twimlResponse
+        );
+        
         twimlResponse.hangup();
 
         // Update call status to completed
@@ -584,20 +769,26 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         nextUrl.searchParams.set('customerName', customerName);
         nextUrl.searchParams.set('step', (step + 1).toString());
         nextUrl.searchParams.set('phoneNumber', phoneNumber);
-        nextUrl.searchParams.set('voiceType', voiceType); // Pass voiceType to next step
+        nextUrl.searchParams.set('voiceType', voiceType);
+        nextUrl.searchParams.set('callId', callId);
 
         const gather = twimlResponse.gather({
           input: 'speech',
           action: nextUrl.toString(),
           timeout: 15,
           method: 'POST',
-          // Add speech recognition settings for better accuracy
           speechTimeout: 'auto'
         });
-        gather.say(questions[questionIndex].question, { 
-          voice: 'Polly.Aditi',
-          language: 'en-IN'
-        });
+        
+        // Use smart hybrid for the question
+        const audioType = questionIndex === 0 ? 'first_question' : 'key_questions';
+        await generateSmartAudio(
+          questions[questionIndex].question,
+          audioType,
+          callId,
+          gather
+        );
+        
         console.log(`Asked question ${questionIndex}: ${questions[questionIndex].question}`);
       }
     }
@@ -922,6 +1113,84 @@ router.get('/test-twillml', async (req, res) => {
   }
 });
 
+// Test URL generation for different environments
+router.get('/test-url-generation', async (req, res) => {
+  try {
+    console.log('🧪 Testing URL generation...');
+    
+    const testText = 'Hello! This is a test of URL generation.';
+    const result = await generateAndSaveAudioWithFallback(testText, 'RACHEL', 'url_test');
+    
+    // Get current environment info
+    const envInfo = {
+      NODE_ENV: process.env.NODE_ENV,
+      RENDER: process.env.RENDER,
+      BASE_URL: process.env.BASE_URL,
+      currentUrl: result.audioUrl || 'No URL generated'
+    };
+    
+    console.log('Environment Info:', envInfo);
+    
+    res.json({
+      success: true,
+      message: 'URL generation test completed',
+      environment: envInfo,
+      result: result,
+      expectedUrl: result.audioUrl && result.audioUrl.includes('vok-ai.onrender.com') ? 'Production URL' : 'Local URL'
+    });
+  } catch (error) {
+    console.error('❌ URL generation test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'URL generation test failed',
+      error: error.message
+    });
+  }
+});
+
+// Test TwiML with ElevenLabs audio
+router.get('/test-twillml-elevenlabs', async (req, res) => {
+  try {
+    console.log('🧪 Testing TwiML with ElevenLabs audio...');
+    
+    const twiml = new twilio.twiml.VoiceResponse();
+    
+    // Generate ElevenLabs audio
+    const testText = 'Hello! This is ElevenLabs audio in TwiML. If you can hear this, everything is working!';
+    const result = await generateAndSaveAudioWithFallback(testText, 'RACHEL', 'test_twillml');
+    
+    if (result.fallback) {
+      console.log('⚠️ ElevenLabs failed, using Twilio TTS in TwiML');
+      twiml.say(testText, { 
+        voice: 'Polly.Aditi',
+        language: 'en-IN'
+      });
+    } else {
+      console.log('✅ Using ElevenLabs audio in TwiML');
+      console.log('Audio URL:', result.audioUrl);
+      twiml.play(result.audioUrl);
+    }
+    
+    twiml.pause({ length: 1 });
+    twiml.say('This is Twilio TTS to confirm both are working.', { 
+      voice: 'Polly.Aditi',
+      language: 'en-IN'
+    });
+    twiml.hangup();
+    
+    console.log('Generated TwiML:', twiml.toString());
+    
+    res.type('text/xml').send(twiml.toString());
+  } catch (error) {
+    console.error('❌ TwiML with ElevenLabs test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'TwiML with ElevenLabs test failed',
+      error: error.message
+    });
+  }
+});
+
 // Get call cost information
 router.get('/cost-info', protect, async (req, res) => {
   try {
@@ -994,6 +1263,141 @@ router.get('/history', protect, async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to fetch call history',
       message: error.message 
+    });
+  }
+});
+
+// Monitor hybrid system performance
+router.get('/hybrid-status', async (req, res) => {
+  try {
+    const now = Date.now();
+    
+    // Calculate usage statistics
+    const currentCallUsage = Array.from(elevenLabsUsage.perCall.values());
+    const totalCallUsage = currentCallUsage.reduce((sum, usage) => sum + usage, 0);
+    const activeCalls = elevenLabsUsage.perCall.size;
+    
+    // Check if limits are reset
+    const minuteResetIn = Math.max(0, elevenLabsUsage.perMinute.resetTime - now);
+    const hourResetIn = Math.max(0, elevenLabsUsage.perHour.resetTime - now);
+    
+    const status = {
+      system: 'Smart Hybrid TTS System',
+      timestamp: new Date().toISOString(),
+      
+      // Current usage
+      currentUsage: {
+        perMinute: elevenLabsUsage.perMinute.count,
+        perHour: elevenLabsUsage.perHour.count,
+        activeCalls: activeCalls,
+        totalCallUsage: totalCallUsage
+      },
+      
+      // Limits
+      limits: {
+        perCall: HYBRID_CONFIG.MAX_ELEVENLABS_PER_CALL,
+        perMinute: HYBRID_CONFIG.MAX_ELEVENLABS_PER_MINUTE,
+        perHour: HYBRID_CONFIG.MAX_ELEVENLABS_PER_HOUR
+      },
+      
+      // Reset times
+      resets: {
+        minuteResetIn: Math.round(minuteResetIn / 1000) + ' seconds',
+        hourResetIn: Math.round(hourResetIn / 1000 / 60) + ' minutes'
+      },
+      
+      // Priority system
+      priorities: {
+        high: HYBRID_CONFIG.PRIORITY.HIGH,
+        medium: HYBRID_CONFIG.PRIORITY.MEDIUM,
+        low: HYBRID_CONFIG.PRIORITY.LOW
+      },
+      
+      // System health
+      health: {
+        minuteLimitReached: elevenLabsUsage.perMinute.count >= HYBRID_CONFIG.MAX_ELEVENLABS_PER_MINUTE,
+        hourLimitReached: elevenLabsUsage.perHour.count >= HYBRID_CONFIG.MAX_ELEVENLABS_PER_HOUR,
+        systemStatus: 'operational'
+      }
+    };
+    
+    res.json({
+      success: true,
+      status
+    });
+  } catch (error) {
+    console.error('Hybrid status check error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get hybrid status',
+      error: error.message
+    });
+  }
+});
+
+// Test ElevenLabs integration
+router.get('/test-elevenlabs', async (req, res) => {
+  try {
+    console.log('\n=== Testing ElevenLabs Integration ===');
+    
+    const result = await testElevenLabsConnection();
+    
+    if (result.success) {
+      console.log('✅ ElevenLabs test successful');
+      console.log('Available voices:', result.availableVoices);
+      console.log('Configured voices:', result.configuredVoices);
+    } else {
+      console.log('❌ ElevenLabs test failed:', result.error);
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('❌ ElevenLabs test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'ElevenLabs test failed',
+      error: error.message
+    });
+  }
+});
+
+// Test ElevenLabs connection (simple status check)
+router.get('/test-elevenlabs-status', async (req, res) => {
+  try {
+    console.log('🔍 Testing ElevenLabs connection status...');
+    
+    const response = await fetch('https://api.elevenlabs.io/v1/voices', {
+      headers: {
+        'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      res.json({
+        status: 'success',
+        message: 'ElevenLabs connection successful',
+        availableVoices: data.voices ? data.voices.length : 0,
+        apiKeyStatus: process.env.ELEVENLABS_API_KEY ? 'Loaded' : 'Not loaded'
+      });
+    } else {
+      const errorText = await response.text();
+      res.status(response.status).json({
+        status: 'error',
+        message: 'ElevenLabs connection failed',
+        statusCode: response.status,
+        error: errorText,
+        apiKeyStatus: process.env.ELEVENLABS_API_KEY ? 'Loaded' : 'Not loaded'
+      });
+    }
+  } catch (error) {
+    console.error('❌ ElevenLabs status check error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to check ElevenLabs status',
+      error: error.message,
+      apiKeyStatus: process.env.ELEVENLABS_API_KEY ? 'Loaded' : 'Not loaded'
     });
   }
 });

@@ -271,63 +271,58 @@ export async function generateSpeech(text, voiceId = VOICES.RACHEL.id) {
   }
 }
 
-// Generate and save audio with enhanced file management
+// Generate and save audio file with proper URL handling
 export async function generateAndSaveAudio(text, voiceType = 'RACHEL', audioType = 'general') {
   try {
-    const voice = VOICES[voiceType] || VOICES.RACHEL;
-    
     // Check cache first
-    const cacheKey = `${audioType}_${voiceType}_${text.substring(0, 50)}`;
+    const cacheKey = `${audioType}_${voiceType}_${text}`;
     if (audioCache.has(cacheKey)) {
       const cached = audioCache.get(cacheKey);
       if (Date.now() - cached.timestamp < CACHE_EXPIRY) {
-        log('INFO', 'Audio retrieved from cache', { cacheKey, audioUrl: cached.audioUrl });
+        log('INFO', 'Using cached audio', { cacheKey, audioType });
         return cached.audioUrl;
+      } else {
+        audioCache.delete(cacheKey);
       }
     }
-    
-    // Generate unique filename
-    const timestamp = Date.now();
-    const sanitizedText = text.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
-    const filename = `${audioType}_${voiceType}_${sanitizedText}_${timestamp}.mp3`;
-    const filepath = path.join(__dirname, '..', 'audio', filename);
-    
+
     log('INFO', 'Generating and saving audio', { 
-      textPreview: text.substring(0, 50),
-      filepath,
+      textPreview: text.substring(0, 50), 
+      filepath: getAudioFilePath(text, voiceType, audioType),
       voiceType
     });
+
+    const audioBuffer = await generateSpeech(text, VOICES[voiceType]?.id || VOICES.RACHEL.id);
     
-    const audioBuffer = await generateSpeech(text, voice.id);
+    const filepath = getAudioFilePath(text, voiceType, audioType);
+    // Convert ArrayBuffer to Buffer for file writing
+    const buffer = Buffer.from(audioBuffer);
+    fs.writeFileSync(filepath, buffer);
     
-    // Ensure audio directory exists
-    const audioDir = path.dirname(filepath);
-    if (!fs.existsSync(audioDir)) {
-      fs.mkdirSync(audioDir, { recursive: true });
-      log('INFO', 'Audio directory created', { audioDir });
-    }
+    // Generate proper URL based on environment
+    const baseUrl = getBaseUrl();
+    const filename = path.basename(filepath);
+    const audioUrl = `${baseUrl}/audio/${filename}`;
     
-    // Write audio file
-    fs.writeFileSync(filepath, Buffer.from(audioBuffer));
-    log('INFO', 'Audio file saved', { filepath, size: audioBuffer.byteLength });
-    
-    // Return public URL for Twilio
-    const publicUrl = `${process.env.BASE_URL}/audio/${filename}`;
-    
+    log('INFO', 'Audio file saved', { 
+      filepath, 
+      size: buffer.byteLength 
+    });
+
     // Cache the result
     audioCache.set(cacheKey, {
+      audioUrl,
       timestamp: Date.now(),
-      audioUrl: publicUrl,
-      filepath: filepath
+      filepath
     });
-    
+
     log('INFO', 'Audio generation complete', { 
-      publicUrl, 
-      filepath, 
-      cacheKey 
+      publicUrl: audioUrl,
+      filepath,
+      cacheKey
     });
-    
-    return publicUrl;
+
+    return audioUrl;
   } catch (error) {
     log('ERROR', 'Audio generation and save failed', { 
       error: error.message, 
@@ -336,6 +331,40 @@ export async function generateAndSaveAudio(text, voiceType = 'RACHEL', audioType
     });
     throw error;
   }
+}
+
+// Function to get the appropriate base URL
+function getBaseUrl() {
+  // Check if we're in production (Render)
+  if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
+    return process.env.BASE_URL || 'https://vok-ai.onrender.com';
+  }
+  
+  // Check if BASE_URL is explicitly set (for testing)
+  if (process.env.BASE_URL) {
+    return process.env.BASE_URL;
+  }
+  
+  // Default to localhost for development
+  return 'http://localhost:5001';
+}
+
+// Function to generate audio file path
+function getAudioFilePath(text, voiceType, audioType) {
+  // Generate unique filename
+  const timestamp = Date.now();
+  const sanitizedText = text.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+  const filename = `${audioType}_${voiceType}_${sanitizedText}_${timestamp}.mp3`;
+  const filepath = path.join(__dirname, '..', 'audio', filename);
+  
+  // Ensure audio directory exists
+  const audioDir = path.dirname(filepath);
+  if (!fs.existsSync(audioDir)) {
+    fs.mkdirSync(audioDir, { recursive: true });
+    log('INFO', 'Audio directory created', { audioDir });
+  }
+  
+  return filepath;
 }
 
 // Generate audio with intelligent fallback

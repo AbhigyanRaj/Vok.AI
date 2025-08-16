@@ -1,197 +1,158 @@
-# 🚀 ELEVENLABS PRODUCTION SETUP GUIDE
+# ElevenLabs Integration Setup
 
-## 🎯 **OVERVIEW**
-This guide will help you set up ElevenLabs for production use with your Vok.AI calling system. The implementation includes:
-- **Production-grade error handling**
-- **Intelligent rate limiting**
-- **Automatic fallback to Twilio TTS**
-- **Audio caching for performance**
-- **Comprehensive monitoring**
+## 🎯 Overview
+This guide explains how to set up ElevenLabs TTS integration for Vok.AI voice calls.
 
-## 🔑 **STEP 1: CREATE A CLEAN ELEVENLABS ACCOUNT**
+## 🚀 Quick Setup
 
-### **1.1 Use a Different Network/IP**
-- **Don't use the same IP** where your previous accounts were created
-- **Use a different device** (mobile hotspot, different WiFi, etc.)
-- **Use incognito/private browsing mode**
-
-### **1.2 Account Creation Process**
-1. Go to [ElevenLabs.io](https://elevenlabs.io)
-2. **Use a completely new email** (Gmail, Outlook, etc.)
-3. **Use a different name** than your previous accounts
-4. **Verify your email** immediately
-5. **Don't use VPN/proxy** during account creation
-
-### **1.3 Get Your API Key**
-1. After verification, go to your profile
-2. Click on "API Key" in the left sidebar
-3. Copy your new API key (starts with `sk_`)
-
-## ⚙️ **STEP 2: ENVIRONMENT CONFIGURATION**
-
-### **2.1 Update Your .env File**
+### 1. Environment Variables
+Add to your `.env` file:
 ```env
-# ElevenLabs Configuration
-ELEVENLABS_API_KEY=your_new_api_key_here
-
-# Base URL for your backend
-BASE_URL=http://localhost:5001
-
-# Other required variables...
+ELEVENLABS_API_KEY=your_api_key_here
+BASE_URL=https://vok-ai.onrender.com  # For production
 ```
 
-### **2.2 Restart Your Backend Server**
+### 2. Local Development
+For local testing with Twilio calls:
 ```bash
-cd backend
+# Install ngrok
+npm install -g ngrok
+
+# Start ngrok
+ngrok http 5001
+
+# Set the ngrok URL as BASE_URL
+export BASE_URL=https://your-ngrok-url.ngrok.io
+
+# Restart your backend
 npm run dev
 ```
 
-## 🧪 **STEP 3: TESTING & VALIDATION**
+## 🧪 Testing
 
-### **3.1 Run the Production Test Suite**
+### Test Endpoints
+- **URL Generation**: `GET /api/calls/test-url-generation`
+- **TwiML with ElevenLabs**: `GET /api/calls/test-twillml-elevenlabs`
+- **Hybrid Status**: `GET /api/calls/hybrid-status`
+- **ElevenLabs Status**: `GET /api/calls/test-elevenlabs-status`
+
+### Test Commands
 ```bash
-cd backend
-node test-production-tts.js
+# Test URL generation
+curl http://localhost:5001/api/calls/test-url-generation
+
+# Test TwiML generation
+curl http://localhost:5001/api/calls/test-twillml-elevenlabs
+
+# Check hybrid system status
+curl http://localhost:5001/api/calls/hybrid-status
 ```
 
-### **3.2 Expected Results**
-- ✅ **Connection Test**: Should show "SUCCESS"
-- ✅ **TTS Generation**: Should generate audio with ElevenLabs
-- ✅ **Health Check**: Should show "HEALTHY" status
-- ✅ **Performance**: Response time under 5 seconds
+## 🎤 How It Works
 
-### **3.3 If Tests Fail**
-- Check your API key is correct
-- Verify your .env file is loaded
-- Check network connectivity
-- Review error messages in the test output
+### Smart Hybrid System
+- **High Priority**: Greeting, First Question, Outro (uses ElevenLabs)
+- **Medium Priority**: Key Questions (uses ElevenLabs if within limits)
+- **Low Priority**: Confirmations, Decline messages (uses Twilio TTS)
 
-## 🏗️ **STEP 4: PRODUCTION DEPLOYMENT**
+### Rate Limiting
+- **Per Call**: 3 ElevenLabs requests maximum
+- **Per Minute**: 5 ElevenLabs requests maximum
+- **Per Hour**: 20 ElevenLabs requests maximum
 
-### **4.1 Update Production Environment**
-- Set `NODE_ENV=production` in your production .env
-- Update `BASE_URL` to your production domain
-- Ensure `ELEVENLABS_API_KEY` is set
+### Fallback System
+- If ElevenLabs fails → automatically uses Twilio TTS
+- If rate limits reached → uses Twilio TTS
+- 100% reliability guaranteed
 
-### **4.2 Monitor Production Logs**
-The system will automatically log:
-- API request attempts
-- Success/failure rates
-- Rate limiting information
-- Cache performance
-- Fallback usage
+## 🌍 Environment Support
 
-### **4.3 Health Monitoring**
-Use the health check endpoint:
-```
-GET /api/calls/health-elevenlabs
-```
+### Local Development
+- Uses `http://localhost:5001` for audio URLs
+- Perfect for development and testing
 
-## 🛡️ **STEP 5: PRODUCTION BEST PRACTICES**
+### Production (Render)
+- Uses `https://vok-ai.onrender.com` for audio URLs
+- Automatically detected when `NODE_ENV=production`
 
-### **5.1 Rate Limiting**
-- **Free Tier**: 10,000 characters/month
-- **Current Limits**: 50 requests/minute, 1000/hour
-- **Automatic Throttling**: Built into the system
+### Custom Testing
+- Set `BASE_URL` environment variable
+- Overrides default behavior
 
-### **5.2 Caching Strategy**
-- **Audio Cache**: 24-hour expiry
-- **Voice Info Cache**: Reduces API calls
-- **Automatic Cleanup**: Every hour
+## 📊 Monitoring
 
-### **5.3 Fallback System**
-- **Primary**: ElevenLabs TTS
-- **Fallback**: Twilio TTS
-- **Seamless**: Users won't notice the switch
-
-## 🔍 **STEP 6: TROUBLESHOOTING**
-
-### **6.1 Common Issues**
-
-#### **Issue: 401 Unauthorized**
-**Cause**: Account restriction or invalid API key
-**Solution**: 
-- Create a new account with different IP
-- Verify API key is correct
-- Check account status in ElevenLabs dashboard
-
-#### **Issue: Rate Limit Exceeded**
-**Cause**: Too many requests
-**Solution**:
-- Wait for rate limit to reset
-- Implement request batching
-- Consider upgrading to paid plan
-
-#### **Issue: Audio Not Playing**
-**Cause**: File path or URL issues
-**Solution**:
-- Check audio directory exists
-- Verify BASE_URL is correct
-- Check file permissions
-
-### **6.2 Debug Commands**
+### Hybrid System Status
+Check current usage and limits:
 ```bash
-# Test connection
-curl -X GET "https://api.elevenlabs.io/v1/voices" \
-  -H "xi-api-key: YOUR_API_KEY"
-
-# Check environment
-node -e "console.log(process.env.ELEVENLABS_API_KEY)"
-
-# Run health check
-node -e "import('./src/config/elevenlabs.js').then(m => m.healthCheck().then(console.log))"
+curl http://localhost:5001/api/calls/hybrid-status
 ```
 
-## 📊 **STEP 7: MONITORING & METRICS**
+### Response Format
+```json
+{
+  "success": true,
+  "status": {
+    "currentUsage": {
+      "perMinute": 2,
+      "perHour": 5,
+      "activeCalls": 1
+    },
+    "limits": {
+      "perCall": 3,
+      "perMinute": 5,
+      "perHour": 20
+    },
+    "health": {
+      "systemStatus": "operational"
+    }
+  }
+}
+```
 
-### **7.1 Key Metrics to Watch**
-- **Success Rate**: Should be >95%
-- **Response Time**: Should be <5 seconds
-- **Fallback Usage**: Should be <10%
-- **Cache Hit Rate**: Should be >80%
+## 🔧 Troubleshooting
 
-### **7.2 Log Analysis**
+### Common Issues
+
+1. **Audio not playing in calls**
+   - Check if audio files are accessible via URL
+   - Verify BASE_URL is set correctly
+   - Test with ngrok for local development
+
+2. **ElevenLabs API errors**
+   - Check API key validity
+   - Verify account status (free vs paid)
+   - Check rate limits
+
+3. **Rate limiting issues**
+   - Monitor usage with hybrid-status endpoint
+   - Adjust limits in HYBRID_CONFIG if needed
+
+### Debug Commands
 ```bash
-# Filter ElevenLabs logs
-grep "ElevenLabs:" your-app.log
+# Check audio file accessibility
+curl -I "http://localhost:5001/audio/filename.mp3"
 
-# Check error rates
-grep "ERROR.*ElevenLabs" your-app.log | wc -l
+# Test ElevenLabs connection
+curl http://localhost:5001/api/calls/test-elevenlabs-status
+
+# Check TwiML generation
+curl http://localhost:5001/api/calls/test-twillml-elevenlabs
 ```
 
-## 🚀 **STEP 8: SCALING & OPTIMIZATION**
+## 🎯 Best Practices
 
-### **8.1 Performance Optimization**
-- **Batch Requests**: Group multiple TTS calls
-- **Pre-generate**: Common phrases in advance
-- **CDN**: Serve audio files from CDN
+1. **Use ngrok for local testing** - Ensures Twilio can access your audio files
+2. **Monitor usage** - Check hybrid-status regularly
+3. **Test thoroughly** - Use test endpoints before making real calls
+4. **Keep API key secure** - Never commit to version control
 
-### **8.2 Cost Optimization**
-- **Free Tier**: 10,000 characters/month
-- **Paid Plans**: Start at $22/month
-- **Bulk Discounts**: Available for high usage
-
-## 🎉 **SUCCESS CRITERIA**
-
-Your ElevenLabs integration is working when:
-1. ✅ **Connection test passes**
-2. ✅ **TTS generation works**
-3. ✅ **Audio files are created**
-4. ✅ **Calls use ElevenLabs voices**
-5. ✅ **Fallback system works seamlessly**
-6. ✅ **Performance is acceptable**
-
-## 📞 **SUPPORT**
+## 📞 Support
 
 If you encounter issues:
-1. **Check the logs** for detailed error messages
-2. **Run the test suite** to isolate problems
-3. **Verify your account status** in ElevenLabs dashboard
-4. **Contact ElevenLabs support** for account issues
-
----
-
-**🎯 Remember**: This is a production-grade implementation designed to handle failures gracefully. Even if ElevenLabs has issues, your calls will continue to work with Twilio TTS fallback.
+1. Check the troubleshooting section
+2. Review the logs in your terminal
+3. Test with the provided endpoints
+4. Verify your ElevenLabs account status
 
 
 
