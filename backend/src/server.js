@@ -3,23 +3,29 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Load environment variables first
+dotenv.config();
+
+// Import database and utilities
 import connectDB from './config/database.js';
 import { getDBStatus } from './utils/dbUtils.js';
-import { initializeDatabase, checkDatabaseHealth } from './utils/initDB.js';
+import { initializeDatabase, checkDatabaseHealth, checkAudioDirectoryHealth } from './utils/initDB.js';
+
+// Import routes
 import authRoutes from './routes/auth.js';
 import moduleRoutes from './routes/modules.js';
 import callRoutes from './routes/calls.js';
 import userRoutes from './routes/users.js';
 
-dotenv.config();
-
-// Debug: Check if environment variables are loaded
-console.log('Environment check:');
-console.log('MONGODB_URI:', process.env.MONGODB_URI ? 'Loaded' : 'NOT LOADED');
-console.log('PORT:', process.env.PORT);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Debug: Check if environment variables are loaded
 
 // Security middleware
 app.use(helmet());
@@ -43,6 +49,9 @@ const limiter = rateLimit({
   max: 100 // limit each IP to 100 requests per windowMs
 });
 app.use(limiter);
+
+// Serve audio files statically
+app.use('/audio', express.static(path.resolve('src/audio')));
 
 // Connect to MongoDB and initialize
 const startServer = async () => {
@@ -77,11 +86,13 @@ app.use('/api/users', userRoutes);
 app.get('/api/health', async (req, res) => {
   try {
     const dbHealth = await checkDatabaseHealth();
+    const audioHealth = await checkAudioDirectoryHealth();
     
     res.json({ 
       status: 'OK', 
       message: 'Vok.AI API is running',
       database: dbHealth,
+      audio: audioHealth,
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV
     });

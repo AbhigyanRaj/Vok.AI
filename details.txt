@@ -1,0 +1,176 @@
+% Vok.AI Project Detailed Overview
+% Suitable for Technical Presentation
+\documentclass[12pt]{article}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\definecolor{codebg}{rgb}{0.95,0.95,0.95}
+\lstset{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible
+}
+
+\title{Vok.AI: Voice-powered Communication \\ \large A Comprehensive Technical Overview}
+\author{Prepared for Technical Presentation}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section*{Introduction}
+Vok.AI is a modern, AI-powered voice automation platform designed to streamline business communication through automated outbound calls, real-time transcription, and smart analytics. The platform leverages state-of-the-art technologies in both frontend and backend, integrating with external services like Twilio and OpenAI to deliver a seamless voice-first experience.
+
+\section{Project Overview}
+\begin{itemize}
+  \item \textbf{Goal:} Enable businesses to create custom call scripts, automate outbound calls, and analyze call responses using AI.
+  \item \textbf{Key Features:}
+    \begin{itemize}
+      \item Voice module creation (custom call scripts)
+      \item Automated calling (Twilio integration)
+      \item AI transcription (OpenAI Whisper/Gemini)
+      \item Smart analytics and call summaries
+      \item Token-based billing system
+      \item Responsive, modern UI
+    \end{itemize}
+  \item \textbf{Status:} Under active development
+\end{itemize}
+
+\section{System Architecture}
+\subsection{High-Level Architecture}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{architecture.png} % Replace with actual diagram if available
+\end{center}
+
+\textbf{Components:}
+\begin{itemize}
+  \item \textbf{Frontend (React + TypeScript):} User interface for module management, call dashboard, analytics, and settings.
+  \item \textbf{Backend (Node.js + Express):} Handles authentication, API endpoints, business logic, and database operations.
+  \item \textbf{External Services:}
+    \begin{itemize}
+      \item Twilio Voice (outbound calls)
+      \item OpenAI Whisper/Gemini (transcription, summarization)
+      \item MongoDB Atlas (cloud database)
+    \end{itemize}
+\end{itemize}
+
+\subsection{Detailed Flow}
+\begin{enumerate}
+  \item User creates a voice module (call script) via the frontend.
+  \item Module is saved in MongoDB via backend API.
+  \item User initiates a call; backend triggers Twilio to place the call.
+  \item Call audio is streamed to OpenAI for transcription and summarization.
+  \item Results and analytics are stored and visualized in the frontend.
+\end{enumerate}
+
+\section{Backend: Node.js + Express}
+\subsection{Core Responsibilities}
+\begin{itemize}
+  \item User authentication (Google OAuth, JWT)
+  \item Module management (CRUD for call scripts)
+  \item Call management (initiate, track, analyze calls)
+  \item Token-based billing (deduct tokens per call)
+  \item Integration with Twilio and OpenAI APIs
+  \item Security: Helmet, CORS, rate limiting, input validation
+\end{itemize}
+
+\subsection{Key API Endpoints}
+\begin{itemize}
+  \item \texttt{POST /api/auth/google} -- Google OAuth login
+  \item \texttt{GET /api/modules} -- List user modules
+  \item \texttt{POST /api/modules} -- Create module
+  \item \texttt{POST /api/calls/initiate} -- Start a call
+  \item \texttt{GET /api/calls/history} -- Call history
+  \item \texttt{GET /api/users/analytics} -- User analytics
+\end{itemize}
+
+\subsection{Database Models}
+\begin{itemize}
+  \item \textbf{User:} email, name, tokens, googleId, subscription, totalCallsMade
+  \item \textbf{Module:} userId, name, description, type (loan/credit/custom), questions, isActive
+  \item \textbf{Call:} userId, moduleId, customerName, phoneNumber, status, duration, responses, transcription, summary, evaluation
+\end{itemize}
+
+\subsection{Integrations}
+\begin{itemize}
+  \item \textbf{Twilio:} Outbound voice calls, webhook handling, call status tracking
+  \item \textbf{OpenAI Whisper/Gemini:} Audio transcription, call summarization, eligibility evaluation
+  \item \textbf{ElevenLabs:} High-quality TTS fallback for greetings/questions
+\end{itemize}
+
+\section{Frontend: React + TypeScript}
+\subsection{Core Features}
+\begin{itemize}
+  \item Responsive UI with Tailwind CSS
+  \item Module creation and management (drag-and-drop, real-time editing)
+  \item Call initiation and status tracking
+  \item Analytics dashboard (call stats, success rates, recent calls)
+  \item Token purchase and balance tracking
+  \item Google OAuth authentication
+\end{itemize}
+
+\subsection{Key Components}
+\begin{itemize}
+  \item \texttt{ModulesPage}: Manage and edit voice modules
+  \item \texttt{AnalyticsPage}: Visualize call analytics
+  \item \texttt{CreateModule}: Modal for building new modules
+  \item \texttt{BuyToken}: Purchase tokens for calls
+  \item \texttt{ProtectedRoute}: Auth-guarded routes
+\end{itemize}
+
+\section{Token-Based Billing}
+\begin{itemize}
+  \item Each call costs a fixed number of tokens (default: 5)
+  \item Users can purchase token packages (Starter, Professional, Business)
+  \item Token deduction and balance management handled in backend and reflected in frontend
+\end{itemize}
+
+\section{AI and Analytics}
+\begin{itemize}
+  \item \textbf{Transcription:} Real-time audio-to-text using OpenAI Whisper or Gemini
+  \item \textbf{Summarization:} LLM-based call summaries and insights
+  \item \textbf{Eligibility Evaluation:} Automated decisioning for loan/credit modules
+  \item \textbf{Analytics Dashboard:} Success rates, call durations, status breakdown, recent call transcripts
+\end{itemize}
+
+\section{Security and Best Practices}
+\begin{itemize}
+  \item JWT authentication for all protected endpoints
+  \item Rate limiting and CORS for API security
+  \item Helmet for HTTP headers
+  \item Input validation and error handling throughout
+\end{itemize}
+
+\section{How to Pitch Vok.AI to a Professor}
+\begin{enumerate}
+  \item \textbf{Problem Statement:} Manual outbound calling is inefficient and hard to scale. Businesses need automated, intelligent voice solutions.
+  \item \textbf{Solution:} Vok.AI automates outbound calls, collects responses, and provides actionable analytics using AI.
+  \item \textbf{Technical Innovation:} Combines real-time telephony (Twilio), AI transcription (OpenAI), and modern web tech (React, Node.js).
+  \item \textbf{Scalability:} Cloud-based, modular, and extensible for different business needs.
+  \item \textbf{User Experience:} Intuitive UI, real-time feedback, and actionable insights.
+  \item \textbf{Future Scope:} Multi-tenant support, advanced analytics, integration with more LLMs, and support for inbound calls.
+\end{enumerate}
+
+\section{Development and Deployment}
+\begin{itemize}
+  \item \textbf{Frontend:} React 19, TypeScript, Vite, Tailwind CSS
+  \item \textbf{Backend:} Node.js, Express, MongoDB, JWT, Twilio, OpenAI
+  \item \textbf{Deployment:} Vercel (frontend), Render/other (backend), MongoDB Atlas
+  \item \textbf{Environment:} .env files for API keys and secrets
+\end{itemize}
+
+\section{Conclusion}
+Vok.AI is a robust, extensible platform for automating voice-based business communication. It leverages the latest in AI and web technologies to deliver a scalable, secure, and user-friendly solution for modern enterprises.
+
+\vspace{1cm}
+\noindent\textbf{For more details, see the codebase and documentation.}
+
+\end{document}
+

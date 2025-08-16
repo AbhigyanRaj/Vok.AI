@@ -379,6 +379,7 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
       )}
       {error && <div className="text-red-400 text-xs text-center font-medium">{error}</div>}
       {success && <div className="text-green-400 text-xs text-center font-medium">{success}</div>}
+      
       <Button 
         type="submit" 
         className="mt-2 rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors w-full sm:w-auto text-xs sm:text-base"

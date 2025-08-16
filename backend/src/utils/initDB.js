@@ -2,11 +2,34 @@ import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Module from '../models/Module.js';
 import Call from '../models/Call.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Initialize database indexes and validation
 export const initializeDatabase = async () => {
   try {
     console.log('🔧 Initializing database...');
+    
+    // Create audio directory if it doesn't exist
+    const audioDir = path.join(__dirname, '..', 'audio');
+    if (!fs.existsSync(audioDir)) {
+      fs.mkdirSync(audioDir, { recursive: true });
+      console.log('✅ Audio directory created:', audioDir);
+    } else {
+      console.log('✅ Audio directory already exists:', audioDir);
+    }
+    
+    // Create a test audio file to verify the directory is writable
+    const testFile = path.join(audioDir, 'test.txt');
+    fs.writeFileSync(testFile, 'Audio directory is writable');
+    console.log('✅ Audio directory is writable');
+    
+    // Clean up test file
+    fs.unlinkSync(testFile);
     
     // Create indexes for better performance
     await User.createIndexes();
@@ -144,6 +167,31 @@ export const checkDatabaseHealth = async () => {
       status: 'error',
       connected: false,
       error: error.message
+    };
+  }
+}; 
+
+export const checkAudioDirectoryHealth = async () => {
+  try {
+    // Check if audio directory exists and is writable
+    const audioDir = path.join(__dirname, '..', 'audio');
+    const audioDirExists = fs.existsSync(audioDir);
+    const audioDirWritable = audioDirExists && fs.accessSync ? true : false;
+    
+    return {
+      status: 'healthy',
+      audioDirectory: {
+        exists: audioDirExists,
+        writable: audioDirWritable,
+        path: audioDir
+      },
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    return {
+      status: 'unhealthy',
+      error: error.message,
+      timestamp: new Date().toISOString()
     };
   }
 }; 

@@ -2,6 +2,14 @@ import express from 'express';
 import { makeCall, createTwiMLResponse, validateTwilioRequest } from '../config/twilio.js';
 import { transcribeAudio, generateSummary, evaluateApplication } from '../config/openai.js';
 import { formatPhoneNumber, validatePhoneNumber } from '../utils/phoneUtils.js';
+import { 
+  testElevenLabsConnection, 
+  getVoiceInfo, 
+  sayWithElevenLabs, 
+  generateAndSaveAudio,
+  generateAndSaveAudioWithFallback,
+  VOICES 
+} from '../config/elevenlabs.js';
 import twilio from 'twilio';
 import User from '../models/User.js';
 import Module from '../models/Module.js';
@@ -12,6 +20,76 @@ const router = express.Router();
 
 // Track active calls (in memory - in production, use Redis)
 const activeCalls = new Map();
+
+// Test ElevenLabs TTS generation (must be before parameterized routes)
+router.get('/test-elevenlabs-tts', async (req, res) => {
+  try {
+    console.log('🧪 Testing ElevenLabs TTS generation...');
+    
+    const testText = 'Hello! This is a test of ElevenLabs text-to-speech. If you can hear this, ElevenLabs is working perfectly!';
+    const voiceType = 'RACHEL';
+    
+    console.log('🎯 Attempting to generate speech...');
+    const result = await generateAndSaveAudioWithFallback(testText, voiceType, 'test');
+    
+    if (result.fallback) {
+      res.json({
+        success: false,
+        message: 'ElevenLabs failed, using Twilio fallback',
+        fallback: true,
+        twiml: result.twiml,
+        error: 'ElevenLabs API call failed'
+      });
+    } else {
+      res.json({
+        success: true,
+        message: 'ElevenLabs TTS working perfectly!',
+        audioUrl: result.audioUrl,
+        fallback: false,
+        voiceType: voiceType
+      });
+    }
+  } catch (error) {
+    console.error('❌ ElevenLabs TTS test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'ElevenLabs TTS test failed',
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
+
+// Test ElevenLabs direct API call
+router.get('/test-elevenlabs-direct', async (req, res) => {
+  try {
+    console.log('🧪 Testing ElevenLabs direct API call...');
+    
+    // Import the function directly
+    const { generateSpeech } = await import('../config/elevenlabs.js');
+    
+    const testText = 'Hello test';
+    const voiceId = '21m00Tcm4TlvDq8ikWAM'; // Rachel
+    
+    console.log('🎯 Calling ElevenLabs API directly...');
+    const audioBuffer = await generateSpeech(testText, voiceId);
+    
+    res.json({
+      success: true,
+      message: 'ElevenLabs direct API call successful!',
+      audioSize: audioBuffer.byteLength,
+      voiceId: voiceId
+    });
+  } catch (error) {
+    console.error('❌ ElevenLabs direct API call failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'ElevenLabs direct API call failed',
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
 
 // Initiate a call - AUTH REQUIRED
 router.post('/initiate', protect, async (req, res) => {
@@ -153,27 +231,40 @@ router.post('/initiate', protect, async (req, res) => {
         throw twilioError;
       }
     } else {
-      // Fallback to simple TwiML for local development
+      // Fallback to simple TwiML for local development - FIXED VERSION
       console.log('📞 Using simple TwiML flow for local development');
       
       try {
         const twiml = new twilio.twiml.VoiceResponse();
         
-        // Create a simple call flow for testing
-        twiml.say(`Hello ${customerName}, this is a call from Vok.AI. We have a few questions for you.`, {
-          voice: 'Polly.Aditi'
+        // Get questions from module
+        const questions = module.questions.sort((a, b) => a.order - b.order);
+        
+        // Start with greeting using Twilio TTS (reliable fallback)
+        twiml.say(`Hello ${customerName}, this is a call from Vok.AI. We have a few questions for you.`, { 
+          voice: 'Polly.Aditi',
+          language: 'en-IN'
         });
         twiml.pause({ length: 1 });
         
-        // Ask all questions from the module
-        if (module.questions && module.questions.length > 0) {
-          module.questions.forEach((question, index) => {
-            twiml.say(`Question ${index + 1}: ${question.question}`, { voice: 'Polly.Aditi' });
+        // Ask all questions from the module using Twilio TTS
+        if (questions && questions.length > 0) {
+          for (const [index, question] of questions.entries()) {
+            twiml.say(`Question ${index + 1}: ${question.question}`, { 
+              voice: 'Polly.Aditi',
+              language: 'en-IN'
+            });
             twiml.pause({ length: 3 }); // Give time for response
+          }
+          twiml.say('Thank you for answering all our questions. Have a great day!', { 
+            voice: 'Polly.Aditi',
+            language: 'en-IN'
           });
-          twiml.say('Thank you for answering all our questions. Have a great day!', { voice: 'Polly.Aditi' });
         } else {
-          twiml.say('Thank you for taking our call. Have a great day!', { voice: 'Polly.Aditi' });
+          twiml.say('Thank you for taking our call. Have a great day!', { 
+            voice: 'Polly.Aditi',
+            language: 'en-IN'
+          });
         }
         
         twiml.hangup();
@@ -257,7 +348,7 @@ router.post('/initiate', protect, async (req, res) => {
     // Store initial conversation with proper formatting
     if (module.questions && module.questions.length > 0) {
       const questions = module.questions.sort((a, b) => a.order - b.order);
-      const transcription = `VokAI: Hi ${customerName.trim()}, we are from VokAI. Is it the right time to speak to you about our questions?\n`;
+      const transcription = `VokAI: Hello ${customerName.trim()}, this is a call from Vok.AI. We have a few questions for you.\n`;
       callRecord.transcription = transcription;
     }
 
@@ -307,6 +398,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
     let step = parseInt(req.query.step || req.body.step || '0');
     const phoneNumber = req.query.phoneNumber || req.body.phoneNumber;
     const previousResponse = req.body.SpeechResult || '';
+    const voiceType = req.query.voiceType || req.body.voiceType || 'RACHEL'; // Get voiceType from query or body
 
     console.log('\n=== Handle Call Webhook ===');
     console.log('Module ID:', moduleId);
@@ -328,7 +420,10 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
     const module = await Module.findById(moduleId);
     if (!module) {
       const errorResponse = createTwiMLResponse();
-      errorResponse.say('Sorry, there was an error. Please try again later.', { voice: 'Polly.Aditi' });
+      errorResponse.say('Sorry, there was an error. Please try again later.', { 
+        voice: 'Polly.Aditi',
+        language: 'en-IN'
+      });
       errorResponse.hangup();
       return res.type('text/xml').send(errorResponse.toString());
     }
@@ -345,18 +440,20 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
 
     // Handle different steps of the call
     if (step === 0) {
-      // Initial greeting
+      // Initial greeting - Use reliable Twilio TTS
       console.log('Starting new call flow (step 0)');
-      twimlResponse.say(
-        `Hi ${customerName}, we are from VokAI. Is it the right time to speak to you about our questions?`,
-        { voice: 'Polly.Aditi' }
-      );
+      
+      twimlResponse.say(`Hi ${customerName}, we are from VokAI. Is it the right time to speak to you about our questions?`, { 
+        voice: 'Polly.Aditi',
+        language: 'en-IN'
+      });
 
       const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
       nextUrl.searchParams.set('moduleId', moduleId);
       nextUrl.searchParams.set('customerName', customerName);
       nextUrl.searchParams.set('step', '1');
       nextUrl.searchParams.set('phoneNumber', phoneNumber);
+      nextUrl.searchParams.set('voiceType', voiceType); // Pass voiceType to next step
 
       console.log('Next URL for step 1:', nextUrl.toString());
 
@@ -364,7 +461,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         input: 'speech',
         action: nextUrl.toString(),
         timeout: 8,
-        method: 'POST'
+        method: 'POST',
+        speechTimeout: 'auto'
       });
 
     } else if (step === 1) {
@@ -375,10 +473,10 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         console.log('\n✅ CUSTOMER CONFIRMED AVAILABILITY!');
         console.log('🎯 Moving to questions...');
         
-        twimlResponse.say(
-          `Great! Let me ask you a few questions.`,
-          { voice: 'Polly.Aditi' }
-        );
+        twimlResponse.say(`Great! Let me ask you a few questions.`, { 
+          voice: 'Polly.Aditi',
+          language: 'en-IN'
+        });
         twimlResponse.pause({ length: 0.5 });
 
         const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
@@ -386,23 +484,28 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         nextUrl.searchParams.set('customerName', customerName);
         nextUrl.searchParams.set('step', '2');
         nextUrl.searchParams.set('phoneNumber', phoneNumber);
+        nextUrl.searchParams.set('voiceType', voiceType); // Pass voiceType to next step
 
         const gather = twimlResponse.gather({
           input: 'speech',
           action: nextUrl.toString(),
           timeout: 15,
-          method: 'POST'
+          method: 'POST',
+          speechTimeout: 'auto'
         });
-        gather.say(questions[0].question, { voice: 'Polly.Aditi' });
+        gather.say(questions[0].question, { 
+          voice: 'Polly.Aditi',
+          language: 'en-IN'
+        });
 
       } else {
         console.log('\n❌ CUSTOMER DECLINED OR NO RESPONSE');
         console.log('📞 Ending call...');
         
-        twimlResponse.say(
-          "I understand this isn't a good time. We'll call you back later. Thank you!",
-          { voice: 'Polly.Aditi' }
-        );
+        twimlResponse.say("I understand this isn't a good time. We'll call you back later. Thank you!", { 
+          voice: 'Polly.Aditi',
+          language: 'en-IN'
+        });
         twimlResponse.hangup();
 
         // Update call status
@@ -456,15 +559,15 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       if (questionIndex >= questions.length) {
         // End of questions - play outro
         console.log('End of questions reached, playing outro...');
-        twimlResponse.say(
-          'Thank you for providing the information. We have recorded all your responses.',
-          { voice: 'Polly.Aditi' }
-        );
+        twimlResponse.say('Thank you for providing the information. We have recorded all your responses.', { 
+          voice: 'Polly.Aditi',
+          language: 'en-IN'
+        });
         twimlResponse.pause({ length: 0.5 });
-        twimlResponse.say(
-          'Our team will review your responses. Have a great day!',
-          { voice: 'Polly.Aditi' }
-        );
+        twimlResponse.say('Our team will review your responses. Have a great day!', { 
+          voice: 'Polly.Aditi',
+          language: 'en-IN'
+        });
         twimlResponse.hangup();
 
         // Update call status to completed
@@ -481,6 +584,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         nextUrl.searchParams.set('customerName', customerName);
         nextUrl.searchParams.set('step', (step + 1).toString());
         nextUrl.searchParams.set('phoneNumber', phoneNumber);
+        nextUrl.searchParams.set('voiceType', voiceType); // Pass voiceType to next step
 
         const gather = twimlResponse.gather({
           input: 'speech',
@@ -490,7 +594,10 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           // Add speech recognition settings for better accuracy
           speechTimeout: 'auto'
         });
-        gather.say(questions[questionIndex].question, { voice: 'Polly.Aditi' });
+        gather.say(questions[questionIndex].question, { 
+          voice: 'Polly.Aditi',
+          language: 'en-IN'
+        });
         console.log(`Asked question ${questionIndex}: ${questions[questionIndex].question}`);
       }
     }
@@ -502,7 +609,10 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
     const errorResponse = createTwiMLResponse();
     errorResponse.say(
       'I apologize, but there was an error. We will call you back later.',
-      { voice: 'Polly.Aditi' }
+      { 
+        voice: 'Polly.Aditi',
+        language: 'en-IN'
+      }
     );
     errorResponse.hangup();
     res.type('text/xml').send(errorResponse.toString());
@@ -782,6 +892,36 @@ router.get('/test-twilio', async (req, res) => {
   }
 });
 
+// Test simple TwiML generation
+router.get('/test-twillml', async (req, res) => {
+  try {
+    console.log('🧪 Testing TwiML generation...');
+    
+    const twiml = new twilio.twiml.VoiceResponse();
+    
+    // Simple test with Twilio TTS
+    twiml.say('Hello! This is a test call from Vok.AI. If you can hear this, the audio is working correctly!', { 
+      voice: 'Polly.Aditi',
+      language: 'en-IN'
+    });
+    twiml.pause({ length: 1 });
+    twiml.say('This is a second test message to confirm audio is working.', { 
+      voice: 'Polly.Aditi',
+      language: 'en-IN'
+    });
+    twiml.hangup();
+    
+    res.type('text/xml').send(twiml.toString());
+  } catch (error) {
+    console.error('❌ TwiML test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'TwiML test failed',
+      error: error.message
+    });
+  }
+});
+
 // Get call cost information
 router.get('/cost-info', protect, async (req, res) => {
   try {
@@ -858,6 +998,7 @@ router.get('/history', protect, async (req, res) => {
   }
 });
 
+// IMPORTANT: This route must be LAST to avoid catching other routes
 // Get single call details
 router.get('/:id', async (req, res) => {
   try {
@@ -1032,33 +1173,6 @@ router.post('/test-status', (req, res) => {
       success: true,
       message: 'Status webhook test received',
       timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// Simple webhook test without validation
-router.post('/test-webhook', (req, res) => {
-  try {
-    console.log('=== Test Webhook (No Validation) ===');
-    console.log('Request Body:', req.body);
-    console.log('Request Headers:', req.headers);
-    console.log('Environment:', process.env.NODE_ENV);
-    console.log('Twilio Credentials:', {
-      accountSid: !!process.env.TWILIO_ACCOUNT_SID,
-      authToken: !!process.env.TWILIO_AUTH_TOKEN,
-      phoneNumber: !!process.env.TWILIO_PHONE_NUMBER
-    });
-    
-    res.json({
-      success: true,
-      message: 'Webhook test received without validation',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV
     });
   } catch (error) {
     res.status(500).json({
