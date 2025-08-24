@@ -335,8 +335,11 @@ export async function generateAndSaveAudio(text, voiceType = 'RACHEL', audioType
 
 // Function to get the appropriate base URL
 function getBaseUrl() {
-  // Check if we're in production (Render)
-  if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
+  // Check if we're in production (Render) - multiple ways to detect
+  if (process.env.NODE_ENV === 'production' || 
+      process.env.RENDER || 
+      process.env.BASE_URL?.includes('onrender.com') ||
+      process.env.BASE_URL?.includes('vercel.app')) {
     return process.env.BASE_URL || 'https://vok-ai.onrender.com';
   }
   

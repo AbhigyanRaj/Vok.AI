@@ -1406,6 +1406,39 @@ router.get('/test-elevenlabs-status', async (req, res) => {
   }
 });
 
+// Voice system health check
+router.get('/voices/health', async (req, res) => {
+  try {
+    const elevenLabsStatus = await testElevenLabsConnection();
+    const environmentInfo = {
+      NODE_ENV: process.env.NODE_ENV,
+      BASE_URL: process.env.BASE_URL,
+      RENDER: process.env.RENDER,
+      ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY ? 'Configured' : 'Not configured'
+    };
+    
+    res.json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      elevenLabs: elevenLabsStatus,
+      environment: environmentInfo,
+      message: 'Voice system is operational'
+    });
+  } catch (error) {
+    console.error('❌ Voice health check failed:', error);
+    res.status(500).json({
+      status: 'ERROR',
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      environment: {
+        NODE_ENV: process.env.NODE_ENV,
+        BASE_URL: process.env.BASE_URL,
+        RENDER: process.env.RENDER
+      }
+    });
+  }
+});
+
 // Serve a short demo audio for a given voice (cached)
 router.get('/voices/sample', async (req, res) => {
   try {
@@ -1421,13 +1454,21 @@ router.get('/voices/sample', async (req, res) => {
     const sampleText = `Hello, this is ${voiceName} from Vok.AI!`;
     
     console.log(`🎵 Generating voice sample for ${voiceId}: ${sampleText}`);
+    console.log(`🔧 Environment: ${process.env.NODE_ENV}`);
+    console.log(`🔧 BASE_URL: ${process.env.BASE_URL}`);
+    console.log(`🔧 RENDER: ${process.env.RENDER}`);
     
     // Use a special audioType for caching
     const result = await generateAndSaveAudioWithFallback(sampleText, voiceId, 'voice_sample');
     
     if (result.fallback || !result.audioUrl) {
       console.error(`❌ Failed to generate sample audio for ${voiceId}:`, result);
-      return res.status(500).json({ error: 'Failed to generate sample audio.' });
+      return res.status(500).json({ 
+        error: 'Failed to generate sample audio.',
+        details: result,
+        environment: process.env.NODE_ENV,
+        baseUrl: process.env.BASE_URL
+      });
     }
     
     console.log(`✅ Audio generated successfully for ${voiceId}:`, result.audioUrl);
@@ -1448,7 +1489,13 @@ router.get('/voices/sample', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error generating voice sample:', error);
-    res.status(500).json({ error: 'Failed to generate voice sample.' });
+    console.error('❌ Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to generate voice sample.',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      environment: process.env.NODE_ENV
+    });
   }
 });
 

@@ -36,10 +36,12 @@ app.use(helmet());
 // CORS configuration
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://vok-ai.onrender.com', 'https://vok-ai.vercel.app'] // Vercel frontend domain
+    ? ['https://vok-ai.vercel.app', 'https://vok-ai.onrender.com'] // Vercel frontend domain
     : ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
 app.use(cors(corsOptions));
 
