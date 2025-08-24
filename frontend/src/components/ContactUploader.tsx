@@ -85,6 +85,15 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
         }
         
         const data = await response.json();
+        
+        // Handle fallback case (ElevenLabs free tier limited)
+        if (data.fallback && !data.success) {
+          console.log(`⚠️ Voice preview unavailable for ${voiceId}: ${data.message}`);
+          setError(`Voice preview temporarily unavailable for ${voiceId}. ${data.message}`);
+          setLoadingVoice(null);
+          return;
+        }
+        
         if (!data.success || !data.audioUrl) {
           throw new Error('Invalid response from API');
         }
@@ -98,6 +107,7 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
         
       } catch (error) {
         console.error(`❌ Failed to get audio URL for ${voiceId}:`, error);
+        setError(`Failed to load voice preview for ${voiceId}. Please try again later.`);
         setLoadingVoice(null);
         return;
       } finally {
@@ -124,6 +134,7 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
         setPlayingVoice(null);
         // Remove from cache if it's broken
         setVoiceAudioCache(prev => ({ ...prev, [voiceId]: null }));
+        setError(`Failed to play voice preview for ${voiceId}. Please try again.`);
       };
       
       // Start playing
@@ -133,6 +144,7 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
       } catch (playError) {
         console.error(`❌ Failed to play audio for ${voiceId}:`, playError);
         setPlayingVoice(null);
+        setError(`Failed to play voice preview for ${voiceId}. Please try again.`);
       }
     }
   };

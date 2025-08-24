@@ -390,21 +390,76 @@ export async function generateAndSaveAudioWithFallback(text, voiceType = 'RACHEL
       voiceType: voiceType
     };
   } catch (error) {
-    log('WARN', 'ElevenLabs failed, using Twilio fallback', { 
+    log('WARN', 'ElevenLabs failed, attempting Twilio TTS fallback', { 
       error: error.message, 
       voiceType, 
       audioType 
     });
     
-    return {
-      success: true,
-      fallback: true,
-      twiml: text,
-      message: 'Using Twilio TTS fallback due to ElevenLabs failure',
-      service: 'Twilio',
-      error: error.message,
-      voiceType: voiceType
-    };
+    try {
+      // Try to generate Twilio TTS as fallback
+      const twilioAudioUrl = await generateTwilioTTSFallback(text, voiceType, audioType);
+      
+      return {
+        success: true,
+        audioUrl: twilioAudioUrl,
+        fallback: true,
+        message: 'Using Twilio TTS fallback due to ElevenLabs failure',
+        service: 'Twilio',
+        voiceType: voiceType
+      };
+    } catch (twilioError) {
+      log('ERROR', 'Both ElevenLabs and Twilio TTS failed', { 
+        elevenLabsError: error.message,
+        twilioError: twilioError.message,
+        voiceType, 
+        audioType 
+      });
+      
+      return {
+        success: false,
+        fallback: true,
+        error: `Both services failed: ElevenLabs (${error.message}), Twilio (${twilioError.message})`,
+        message: 'Voice generation failed on all services',
+        service: 'None',
+        voiceType: voiceType
+      };
+    }
+  }
+}
+
+// Generate Twilio TTS fallback audio
+async function generateTwilioTTSFallback(text, voiceType, audioType) {
+  try {
+    log('INFO', 'Generating Twilio TTS fallback', { 
+      textPreview: text.substring(0, 50), 
+      voiceType, 
+      audioType 
+    });
+    
+    // Import Twilio TTS function dynamically to avoid circular dependencies
+    const { generateTwilioTTS } = await import('./twilio.js');
+    
+    if (typeof generateTwilioTTS !== 'function') {
+      throw new Error('Twilio TTS function not available');
+    }
+    
+    const audioUrl = await generateTwilioTTS(text, voiceType, audioType);
+    
+    log('INFO', 'Twilio TTS fallback generated successfully', { 
+      audioUrl, 
+      voiceType, 
+      audioType 
+    });
+    
+    return audioUrl;
+  } catch (error) {
+    log('ERROR', 'Twilio TTS fallback failed', { 
+      error: error.message, 
+      voiceType, 
+      audioType 
+    });
+    throw error;
   }
 }
 

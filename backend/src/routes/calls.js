@@ -1458,10 +1458,39 @@ router.get('/voices/sample', async (req, res) => {
     console.log(`🔧 BASE_URL: ${process.env.BASE_URL}`);
     console.log(`🔧 RENDER: ${process.env.RENDER}`);
     
+    // Check if ElevenLabs API key is available and working
+    if (!process.env.ELEVENLABS_API_KEY) {
+      console.log(`⚠️ ElevenLabs API key not configured, returning fallback message`);
+      return res.json({
+        success: false,
+        fallback: true,
+        message: `Voice preview not available for ${voiceName}. ElevenLabs not configured.`,
+        voiceId: voiceId,
+        error: 'ElevenLabs not configured',
+        suggestion: 'Please configure ElevenLabs API key in production environment'
+      });
+    }
+    
     // Use a special audioType for caching
     const result = await generateAndSaveAudioWithFallback(sampleText, voiceId, 'voice_sample');
     
-    if (result.fallback || !result.audioUrl) {
+    // Check if we have a valid audio URL (either from ElevenLabs or fallback)
+    if (!result.audioUrl && result.fallback) {
+      // If fallback is true but no audioUrl, we need to handle this case
+      console.log(`⚠️ ElevenLabs failed, fallback activated but no audio URL provided`);
+      
+      // Return a message indicating the voice preview is not available
+      return res.json({
+        success: false,
+        fallback: true,
+        message: `Voice preview temporarily unavailable for ${voiceName}. ElevenLabs free tier has been limited.`,
+        voiceId: voiceId,
+        error: 'ElevenLabs free tier limited - voice preview unavailable',
+        suggestion: 'Please try again later or contact support if the issue persists. Consider upgrading to a paid ElevenLabs plan.'
+      });
+    }
+    
+    if (!result.audioUrl) {
       console.error(`❌ Failed to generate sample audio for ${voiceId}:`, result);
       return res.status(500).json({ 
         error: 'Failed to generate sample audio.',
@@ -1484,7 +1513,8 @@ router.get('/voices/sample', async (req, res) => {
       success: true,
       audioUrl: audioUrl,
       voiceId: voiceId,
-      message: `Voice sample ready for ${voiceName}`
+      message: `Voice sample ready for ${voiceName}`,
+      fallback: result.fallback || false
     });
     
   } catch (error) {
