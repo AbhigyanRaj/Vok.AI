@@ -5,6 +5,11 @@ import * as auth from "../lib/auth";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 
+// Get the API base URL for voice samples
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://vok-ai.onrender.com/api'
+  : 'http://localhost:5001/api';
+
 interface Contact {
   name: string;
   phone: string;
@@ -49,62 +54,95 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
+  const [voiceAudioCache, setVoiceAudioCache] = useState<{ [voiceId: string]: string | null }>({});
+  const [loadingVoice, setLoadingVoice] = useState<string | null>(null);
 
   const playDemo = async (voiceId: string) => {
+    // If already playing this voice, stop it
     if (playingVoice === voiceId) {
-      setPlayingVoice(null); // Stop playing if already playing
+      setPlayingVoice(null);
       return;
     }
-    setPlayingVoice(voiceId);
+
+    // Stop any currently playing voice
+    setPlayingVoice(null);
+
+    // Check if we have a cached URL for this voice
+    let audioUrl = voiceAudioCache[voiceId];
     
-    // Use browser's built-in speech synthesis for demo
-    if ('speechSynthesis' in window) {
-      // Ensure voices are loaded
-      let voices = speechSynthesis.getVoices();
-      if (voices.length === 0) {
-        // Wait for voices to load
-        speechSynthesis.onvoiceschanged = () => {
-          voices = speechSynthesis.getVoices();
-          speakDemo(voiceId, voices);
-        };
-        return;
-      }
+    if (!audioUrl) {
+      // First time playing this voice - fetch from backend
+      setLoadingVoice(voiceId);
       
-      speakDemo(voiceId, voices);
-    } else {
-      // Fallback: just show loading state briefly
-      setTimeout(() => setPlayingVoice(null), 1000);
+      try {
+        // Step 1: Get the audio URL from the API
+        const apiUrl = `${API_BASE_URL}/calls/voices/sample?voice=${voiceId}`;
+        console.log(`🎵 Getting audio URL from: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        if (!data.success || !data.audioUrl) {
+          throw new Error('Invalid response from API');
+        }
+        
+        // Step 2: Use the returned audio URL (this is the static file endpoint)
+        audioUrl = data.audioUrl;
+        console.log(`✅ Got audio URL: ${audioUrl}`);
+        
+        // Cache the URL for future use
+        setVoiceAudioCache(prev => ({ ...prev, [voiceId]: audioUrl }));
+        
+      } catch (error) {
+        console.error(`❌ Failed to get audio URL for ${voiceId}:`, error);
+        setLoadingVoice(null);
+        return;
+      } finally {
+        setLoadingVoice(null);
+      }
+    }
+
+    // Play the audio
+    if (audioUrl) {
+      setPlayingVoice(voiceId);
+      
+      console.log(`🎵 Playing voice sample for ${voiceId}: ${audioUrl}`);
+      
+      // Create and play audio from the static file endpoint
+      const audio = new Audio(audioUrl);
+      
+      audio.onended = () => {
+        console.log(`✅ Voice sample finished playing for ${voiceId}`);
+        setPlayingVoice(null);
+      };
+      
+      audio.onerror = (error) => {
+        console.error(`❌ Audio playback error for ${voiceId}:`, error);
+        setPlayingVoice(null);
+        // Remove from cache if it's broken
+        setVoiceAudioCache(prev => ({ ...prev, [voiceId]: null }));
+      };
+      
+      // Start playing
+      try {
+        await audio.play();
+        console.log(`🎵 Started playing voice sample for ${voiceId}`);
+      } catch (playError) {
+        console.error(`❌ Failed to play audio for ${voiceId}:`, playError);
+        setPlayingVoice(null);
+      }
     }
   };
 
-  const speakDemo = (voiceId: string, voices: SpeechSynthesisVoice[]) => {
-    const utterance = new SpeechSynthesisUtterance(`Hello, this is ${ELEVENLABS_FREE_VOICES.find(v => v.id === voiceId)?.name} from Vok.AI!`);
-    
-    // Set voice properties to match the selected voice
-    utterance.rate = 0.9;
-    utterance.pitch = 1.0;
-    utterance.volume = 0.8;
-    
-    // Find a voice that sounds similar (English, female for Rachel/Bella/Domi, male for Antoni/Thomas/Josh)
-    const targetVoice = voices.find(voice => {
-      const isEnglish = voice.lang.startsWith('en');
-      const isFemale = voiceId === 'RACHEL' || voiceId === 'BELLA' || voiceId === 'DOMI';
-      const isMale = voiceId === 'ANTONI' || voiceId === 'THOMAS' || voiceId === 'JOSH';
-      
-      if (isFemale) return isEnglish && voice.name.toLowerCase().includes('female');
-      if (isMale) return isEnglish && voice.name.toLowerCase().includes('male');
-      return isEnglish;
-    }) || voices.find(voice => voice.lang.startsWith('en')) || null;
-    
-    if (targetVoice) {
-      utterance.voice = targetVoice;
-    }
-    
-    utterance.onend = () => setPlayingVoice(null);
-    utterance.onerror = () => setPlayingVoice(null);
-    
-    speechSynthesis.speak(utterance);
-  };
+  useEffect(() => {
+    // Cleanup audio on unmount
+    return () => {
+      // No audioObj to clean up as we are using direct audio streaming
+    };
+  }, []);
 
   // Fetch token information on component mount
   React.useEffect(() => {
@@ -421,13 +459,22 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
                   type="button"
                   className="ml-2 p-1 rounded-full hover:bg-blue-900/30 focus:outline-none"
                   onClick={e => { e.stopPropagation(); playDemo(v.id); }}
-                  disabled={playingVoice === v.id}
+                  disabled={loadingVoice === v.id || playingVoice === v.id}
                   aria-label={`Play sample for ${v.name}`}
                 >
-                  {playingVoice === v.id ? (
-                    <svg className="animate-spin w-4 h-4 text-blue-400" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+                  {loadingVoice === v.id ? (
+                    <svg className="animate-spin w-4 h-4 text-blue-400" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  ) : playingVoice === v.id ? (
+                    <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
+                    </svg>
                   ) : (
-                    <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path d="M6 4l12 6-12 6V4z" /></svg>
+                    <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M6 4l12 6-12 6V4z" />
+                    </svg>
                   )}
                 </button>
               </li>

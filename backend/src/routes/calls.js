@@ -16,6 +16,9 @@ import Module from '../models/Module.js';
 import Call from '../models/Call.js';
 import { protect } from '../middleware/auth.js';
 import path from 'path'; // Added for serving audio files
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
@@ -1416,19 +1419,45 @@ router.get('/voices/sample', async (req, res) => {
       JOSH: 'Josh',
     }[voiceId] || 'Rachel';
     const sampleText = `Hello, this is ${voiceName} from Vok.AI!`;
+    
+    console.log(`🎵 Generating voice sample for ${voiceId}: ${sampleText}`);
+    
     // Use a special audioType for caching
     const result = await generateAndSaveAudioWithFallback(sampleText, voiceId, 'voice_sample');
+    
     if (result.fallback || !result.audioUrl) {
+      console.error(`❌ Failed to generate sample audio for ${voiceId}:`, result);
       return res.status(500).json({ error: 'Failed to generate sample audio.' });
     }
-    // Serve the MP3 file directly
-    const filePath = result.audioUrl.replace(/^.*\/audio\//, path.join(__dirname, '../audio/'));
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.sendFile(filePath);
+    
+    console.log(`✅ Audio generated successfully for ${voiceId}:`, result.audioUrl);
+    
+    // Instead of serving the file directly, return the public URL
+    // This lets the frontend fetch the audio from the static file endpoint
+    const audioUrl = result.audioUrl;
+    
+    console.log(`🔗 Returning public audio URL: ${audioUrl}`);
+    
+    // Return the audio URL as JSON response
+    res.json({
+      success: true,
+      audioUrl: audioUrl,
+      voiceId: voiceId,
+      message: `Voice sample ready for ${voiceName}`
+    });
+    
   } catch (error) {
-    console.error('Error generating voice sample:', error);
+    console.error('❌ Error generating voice sample:', error);
     res.status(500).json({ error: 'Failed to generate voice sample.' });
   }
+});
+
+// Handle CORS preflight for voice sample endpoint
+router.options('/voices/sample', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(200);
 });
 
 // IMPORTANT: This route must be LAST to avoid catching other routes

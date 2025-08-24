@@ -27,6 +27,9 @@ const PORT = process.env.PORT || 5000;
 
 // Debug: Check if environment variables are loaded
 
+// Serve audio files statically BEFORE security middleware
+app.use('/audio', express.static(path.resolve('src/audio')));
+
 // Security middleware
 app.use(helmet());
 
@@ -49,9 +52,6 @@ const limiter = rateLimit({
   max: 100 // limit each IP to 100 requests per windowMs
 });
 app.use(limiter);
-
-// Serve audio files statically
-app.use('/audio', express.static(path.resolve('src/audio')));
 
 // Connect to MongoDB and initialize
 const startServer = async () => {
