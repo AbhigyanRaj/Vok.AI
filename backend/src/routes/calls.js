@@ -17,6 +17,7 @@ import Call from '../models/Call.js';
 import { protect } from '../middleware/auth.js';
 import path from 'path'; // Added for serving audio files
 import { fileURLToPath } from 'url';
+import fs from 'fs'; // Added for file system operations
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -96,7 +97,7 @@ function shouldUseElevenLabs(audioType, callId) {
   
   // Use Twilio for low priority
   if (isLowPriority) {
-    console.log(`🎯 Low priority audio type: ${audioType} - Using Twilio TTS`);
+    console.log(`�� Low priority audio type: ${audioType} - Using Twilio TTS`);
     return false;
   }
   
@@ -1471,50 +1472,18 @@ router.get('/voices/sample', async (req, res) => {
       });
     }
     
-    // Use a special audioType for caching
-    const result = await generateAndSaveAudioWithFallback(sampleText, voiceId, 'voice_sample');
+    // For now, since ElevenLabs free tier is limited, return a fallback message
+    // This prevents the 500 error and provides a better user experience
+    console.log(`⚠️ ElevenLabs free tier limited, returning fallback message for ${voiceId}`);
     
-    // Check if we have a valid audio URL (either from ElevenLabs or fallback)
-    if (!result.audioUrl && result.fallback) {
-      // If fallback is true but no audioUrl, we need to handle this case
-      console.log(`⚠️ ElevenLabs failed, fallback activated but no audio URL provided`);
-      
-      // Return a message indicating the voice preview is not available
-      return res.json({
-        success: false,
-        fallback: true,
-        message: `Voice preview temporarily unavailable for ${voiceName}. ElevenLabs free tier has been limited.`,
-        voiceId: voiceId,
-        error: 'ElevenLabs free tier limited - voice preview unavailable',
-        suggestion: 'Please try again later or contact support if the issue persists. Consider upgrading to a paid ElevenLabs plan.'
-      });
-    }
-    
-    if (!result.audioUrl) {
-      console.error(`❌ Failed to generate sample audio for ${voiceId}:`, result);
-      return res.status(500).json({ 
-        error: 'Failed to generate sample audio.',
-        details: result,
-        environment: process.env.NODE_ENV,
-        baseUrl: process.env.BASE_URL
-      });
-    }
-    
-    console.log(`✅ Audio generated successfully for ${voiceId}:`, result.audioUrl);
-    
-    // Instead of serving the file directly, return the public URL
-    // This lets the frontend fetch the audio from the static file endpoint
-    const audioUrl = result.audioUrl;
-    
-    console.log(`🔗 Returning public audio URL: ${audioUrl}`);
-    
-    // Return the audio URL as JSON response
-    res.json({
-      success: true,
-      audioUrl: audioUrl,
+    return res.json({
+      success: false,
+      fallback: true,
+      message: `Voice preview temporarily unavailable for ${voiceName}. ElevenLabs free tier has been limited.`,
       voiceId: voiceId,
-      message: `Voice sample ready for ${voiceName}`,
-      fallback: result.fallback || false
+      error: 'ElevenLabs free tier limited - voice preview unavailable',
+      suggestion: 'Please try again later or contact support if the issue persists. Consider upgrading to a paid ElevenLabs plan.',
+      service: 'Fallback Message'
     });
     
   } catch (error) {
