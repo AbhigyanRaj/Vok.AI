@@ -27,11 +27,22 @@ const PORT = process.env.PORT || 5000;
 
 // Debug: Check if environment variables are loaded
 
-// Serve audio files statically BEFORE security middleware
-app.use('/audio', express.static(path.resolve('src/audio')));
+// Serve audio files statically BEFORE security middleware with proper headers
+app.use('/audio', (req, res, next) => {
+  // Set CORS headers for audio files
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  next();
+}, express.static(path.resolve('src/audio')));
 
-// Security middleware
-app.use(helmet());
+// Security middleware with relaxed settings for audio
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false
+}));
 
 // CORS configuration
 const corsOptions = {

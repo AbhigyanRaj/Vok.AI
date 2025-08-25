@@ -49,60 +49,11 @@ let elevenLabsUsage = {
   perHour: { count: 0, resetTime: Date.now() + 3600000 }
 };
 
-// Smart function to determine if we should use ElevenLabs
+// Smart function to determine if we should use ElevenLabs - ALWAYS USE ELEVENLABS when public URL available
 function shouldUseElevenLabs(audioType, callId) {
-  // Reset counters if time has passed
-  const now = Date.now();
-  if (now > elevenLabsUsage.perMinute.resetTime) {
-    elevenLabsUsage.perMinute = { count: 0, resetTime: now + 60000 };
-  }
-  if (now > elevenLabsUsage.perHour.resetTime) {
-    elevenLabsUsage.perHour = { count: 0, resetTime: now + 3600000 };
-  }
-  
-  // Check if we've hit any limits
-  const callUsage = elevenLabsUsage.perCall.get(callId) || 0;
-  if (callUsage >= HYBRID_CONFIG.MAX_ELEVENLABS_PER_CALL) {
-    console.log(`🚫 ElevenLabs limit reached for call ${callId} (${callUsage}/${HYBRID_CONFIG.MAX_ELEVENLABS_PER_CALL})`);
-    return false;
-  }
-  
-  if (elevenLabsUsage.perMinute.count >= HYBRID_CONFIG.MAX_ELEVENLABS_PER_MINUTE) {
-    console.log(`🚫 ElevenLabs minute limit reached (${elevenLabsUsage.perMinute.count}/${HYBRID_CONFIG.MAX_ELEVENLABS_PER_MINUTE})`);
-    return false;
-  }
-  
-  if (elevenLabsUsage.perHour.count >= HYBRID_CONFIG.MAX_ELEVENLABS_PER_HOUR) {
-    console.log(`🚫 ElevenLabs hour limit reached (${elevenLabsUsage.perHour.count}/${HYBRID_CONFIG.MAX_ELEVENLABS_PER_HOUR})`);
-    return false;
-  }
-  
-  // Check priority
-  const isHighPriority = HYBRID_CONFIG.PRIORITY.HIGH.includes(audioType);
-  const isMediumPriority = HYBRID_CONFIG.PRIORITY.MEDIUM.includes(audioType);
-  const isLowPriority = HYBRID_CONFIG.PRIORITY.LOW.includes(audioType);
-  
-  // Always use ElevenLabs for high priority
-  if (isHighPriority) {
-    console.log(`🎯 High priority audio type: ${audioType} - Using ElevenLabs`);
-    return true;
-  }
-  
-  // Use ElevenLabs for medium priority if we have room
-  if (isMediumPriority && callUsage < 2) {
-    console.log(`🎯 Medium priority audio type: ${audioType} - Using ElevenLabs (call usage: ${callUsage})`);
-    return true;
-  }
-  
-  // Use Twilio for low priority
-  if (isLowPriority) {
-    console.log(`🎯 Low priority audio type: ${audioType} - Using Twilio TTS`);
-    return false;
-  }
-  
-  // Default to Twilio for unknown types
-  console.log(`🎯 Unknown audio type: ${audioType} - Using Twilio TTS`);
-  return false;
+  // Always use ElevenLabs when we have a public URL (ngrok/production)
+  console.log(`🎯 Using ElevenLabs for ${audioType} - Full ElevenLabs experience enabled`);
+  return true;
 }
 
 // Function to record ElevenLabs usage
@@ -115,17 +66,33 @@ function recordElevenLabsUsage(callId) {
   console.log(`📊 ElevenLabs usage recorded - Call: ${callUsage}, Minute: ${elevenLabsUsage.perMinute.count}, Hour: ${elevenLabsUsage.perHour.count}`);
 }
 
+// Check if we have a publicly accessible URL for audio files
+function hasPublicUrl() {
+  const baseUrl = process.env.BASE_URL || process.env.NGROK_URL;
+  return baseUrl && !baseUrl.includes('localhost') && !baseUrl.includes('127.0.0.1');
+}
+
 // Smart hybrid audio generation function
-async function generateSmartAudio(text, audioType, callId, twimlResponse) {
-  console.log(`🎤 Smart audio generation for: ${audioType}`);
+async function generateSmartAudio(text, audioType, callId, twimlResponse, selectedVoice = 'RACHEL') {
+  console.log(`🎤 Smart audio generation for: ${audioType} with voice: ${selectedVoice}`);
+  
+  // Check if we have a public URL for serving audio files
+  if (!hasPublicUrl()) {
+    console.log(`⚠️ No public URL available - using Twilio TTS directly for ${audioType}`);
+    twimlResponse.say(text, { 
+      voice: HYBRID_CONFIG.TWILIO_VOICE,
+      language: HYBRID_CONFIG.TWILIO_LANGUAGE
+    });
+    return;
+  }
   
   // Check if we should use ElevenLabs
   if (shouldUseElevenLabs(audioType, callId)) {
     try {
-      console.log(`🎤 Attempting ElevenLabs for ${audioType}...`);
+      console.log(`🎤 Attempting ElevenLabs for ${audioType} with voice ${selectedVoice}...`);
       const audio = await generateAndSaveAudioWithFallback(
         text, 
-        HYBRID_CONFIG.ELEVENLABS_VOICE, 
+        selectedVoice, 
         audioType
       );
       
@@ -137,8 +104,19 @@ async function generateSmartAudio(text, audioType, callId, twimlResponse) {
         });
       } else {
         console.log(`✅ ElevenLabs successful for ${audioType}`);
-        twimlResponse.play(audio.audioUrl);
-        recordElevenLabsUsage(callId);
+        console.log(`🔗 Audio URL: ${audio.audioUrl}`);
+        
+        // Verify the URL is publicly accessible
+        if (audio.audioUrl.includes('localhost') || audio.audioUrl.includes('127.0.0.1')) {
+          console.log(`⚠️ Audio URL is localhost - falling back to Twilio TTS`);
+          twimlResponse.say(text, { 
+            voice: HYBRID_CONFIG.TWILIO_VOICE,
+            language: HYBRID_CONFIG.TWILIO_LANGUAGE
+          });
+        } else {
+          twimlResponse.play(audio.audioUrl);
+          recordElevenLabsUsage(callId);
+        }
       }
     } catch (error) {
       console.log(`❌ ElevenLabs failed for ${audioType}, using Twilio TTS fallback`);
@@ -233,7 +211,7 @@ router.get('/test-elevenlabs-direct', async (req, res) => {
 // Initiate a call - AUTH REQUIRED
 router.post('/initiate', protect, async (req, res) => {
   try {
-    const { moduleId, phoneNumber, customerName } = req.body;
+    const { moduleId, phoneNumber, customerName, selectedVoice } = req.body;
     const userId = req.user._id;
 
     // Validation
@@ -325,6 +303,7 @@ router.post('/initiate', protect, async (req, res) => {
         webhookUrl.searchParams.set('customerName', customerName);
         webhookUrl.searchParams.set('phoneNumber', formattedPhone);
         webhookUrl.searchParams.set('step', '0');
+        webhookUrl.searchParams.set('selectedVoice', selectedVoice || 'RACHEL');
 
         const statusCallbackUrl = new URL(`${publicUrl}/api/calls/status`);
         
@@ -387,7 +366,8 @@ router.post('/initiate', protect, async (req, res) => {
           `Hello ${customerName}, this is a call from Vok.AI. We have a few questions for you.`,
           'greeting',
           callId,
-          twiml
+          twiml,
+          selectedVoice
         );
         
         twiml.pause({ length: 1 });
@@ -402,7 +382,8 @@ router.post('/initiate', protect, async (req, res) => {
               `Question ${index + 1}: ${question.question}`,
               audioType,
               callId,
-              twiml
+              twiml,
+              selectedVoice
             );
             
             twiml.pause({ length: 3 }); // Give time for response
@@ -413,7 +394,8 @@ router.post('/initiate', protect, async (req, res) => {
             'Thank you for answering all our questions. Have a great day!',
             'outro',
             callId,
-            twiml
+            twiml,
+            selectedVoice
           );
         } else {
           // Use Twilio TTS for simple message
@@ -554,7 +536,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
     let step = parseInt(req.query.step || req.body.step || '0');
     const phoneNumber = req.query.phoneNumber || req.body.phoneNumber;
     const previousResponse = req.body.SpeechResult || '';
-    const voiceType = req.query.voiceType || req.body.voiceType || 'RACHEL'; // Get voiceType from query or body
+    const selectedVoice = req.query.selectedVoice || req.body.selectedVoice || 'RACHEL'; // Get selectedVoice from query or body
 
     console.log('\n=== Handle Call Webhook ===');
     console.log('Module ID:', moduleId);
@@ -604,10 +586,11 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       
       // Use smart hybrid for greeting (HIGH PRIORITY)
       await generateSmartAudio(
-        `Hi ${customerName}, we are from VokAI. Is it the right time to speak to you about our questions?`,
+        `Hello ${customerName}, this is an automated call from Vok AI. We have a few important questions that will only take 2-3 minutes of your time. Is now a good time to speak with you?`,
         'greeting',
         callId,
-        twimlResponse
+        twimlResponse,
+        selectedVoice
       );
 
       const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
@@ -615,7 +598,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       nextUrl.searchParams.set('customerName', customerName);
       nextUrl.searchParams.set('step', '1');
       nextUrl.searchParams.set('phoneNumber', phoneNumber);
-      nextUrl.searchParams.set('voiceType', voiceType);
+      nextUrl.searchParams.set('selectedVoice', selectedVoice);
       nextUrl.searchParams.set('callId', callId); // Pass callId for tracking
 
       console.log('Next URL for step 1:', nextUrl.toString());
@@ -623,9 +606,13 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       const gather = twimlResponse.gather({
         input: 'speech',
         action: nextUrl.toString(),
-        timeout: 8,
+        timeout: 12,
         method: 'POST',
-        speechTimeout: 'auto'
+        speechTimeout: 'auto',
+        speechModel: 'experimental_conversations',
+        enhanced: true,
+        language: 'en-US',
+        hints: 'yes,no,okay,sure,go ahead,yeah,hmm,uh huh,alright,fine,good,great'
       });
 
     } else if (step === 1) {
@@ -638,12 +625,13 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         console.log('\n✅ CUSTOMER CONFIRMED AVAILABILITY!');
         console.log('🎯 Moving to questions...');
         
-        // Use smart hybrid for confirmation (LOW PRIORITY - will use Twilio)
+        // Use smart hybrid for confirmation
         await generateSmartAudio(
-          'Great! Let me ask you a few questions.',
+          'Perfect! Thank you for your time. I will now ask you a few quick questions. Please speak clearly after each question, and I will wait for your response.',
           'confirmation',
           callId,
-          twimlResponse
+          twimlResponse,
+          selectedVoice
         );
         
         twimlResponse.pause({ length: 0.5 });
@@ -653,15 +641,18 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         nextUrl.searchParams.set('customerName', customerName);
         nextUrl.searchParams.set('step', '2');
         nextUrl.searchParams.set('phoneNumber', phoneNumber);
-        nextUrl.searchParams.set('voiceType', voiceType);
+        nextUrl.searchParams.set('selectedVoice', selectedVoice);
         nextUrl.searchParams.set('callId', callId);
 
         const gather = twimlResponse.gather({
           input: 'speech',
           action: nextUrl.toString(),
-          timeout: 15,
+          timeout: 20,
           method: 'POST',
-          speechTimeout: 'auto'
+          speechTimeout: 'auto',
+          speechModel: 'experimental_conversations',
+          enhanced: true,
+          language: 'en-US'
         });
         
         // Use smart hybrid for the first question (HIGH PRIORITY)
@@ -669,19 +660,21 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           questions[0].question,
           'first_question',
           callId,
-          gather
+          gather,
+          selectedVoice
         );
 
       } else {
         console.log('\n❌ CUSTOMER DECLINED OR NO RESPONSE');
         console.log('📞 Ending call...');
         
-        // Use smart hybrid for decline message (LOW PRIORITY - will use Twilio)
+        // Use smart hybrid for decline message
         await generateSmartAudio(
-          "I understand this isn't a good time. We'll call you back later. Thank you!",
+          "I completely understand. Thank you for your time today. We'll reach out at a more convenient time. Have a wonderful day!",
           'decline',
           callId,
-          twimlResponse
+          twimlResponse,
+          selectedVoice
         );
         
         twimlResponse.hangup();
@@ -741,20 +734,22 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         
         // Use smart hybrid for outro (HIGH PRIORITY)
         await generateSmartAudio(
-          'Thank you for providing the information. We have recorded all your responses.',
+          'Excellent! Thank you so much for taking the time to answer all our questions. Your responses have been successfully recorded and are very valuable to us.',
           'outro',
           callId,
-          twimlResponse
+          twimlResponse,
+          selectedVoice
         );
         
-        twimlResponse.pause({ length: 0.5 });
+        twimlResponse.pause({ length: 1 });
         
-        // Use smart hybrid for final message (LOW PRIORITY - will use Twilio)
+        // Use smart hybrid for final message
         await generateSmartAudio(
-          'Our team will review your responses. Have a great day!',
+          'Our team will carefully review your responses and may follow up if needed. Thank you for choosing Vok AI, and have a fantastic day!',
           'final',
           callId,
-          twimlResponse
+          twimlResponse,
+          selectedVoice
         );
         
         twimlResponse.hangup();
@@ -773,15 +768,18 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         nextUrl.searchParams.set('customerName', customerName);
         nextUrl.searchParams.set('step', (step + 1).toString());
         nextUrl.searchParams.set('phoneNumber', phoneNumber);
-        nextUrl.searchParams.set('voiceType', voiceType);
+        nextUrl.searchParams.set('selectedVoice', selectedVoice);
         nextUrl.searchParams.set('callId', callId);
 
         const gather = twimlResponse.gather({
           input: 'speech',
           action: nextUrl.toString(),
-          timeout: 15,
+          timeout: 20,
           method: 'POST',
-          speechTimeout: 'auto'
+          speechTimeout: 'auto',
+          speechModel: 'experimental_conversations',
+          enhanced: true,
+          language: 'en-US'
         });
         
         // Use smart hybrid for the question
@@ -790,7 +788,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           questions[questionIndex].question,
           audioType,
           callId,
-          gather
+          gather,
+          selectedVoice
         );
         
         console.log(`Asked question ${questionIndex}: ${questions[questionIndex].question}`);
@@ -1451,7 +1450,7 @@ router.get('/voices/sample', async (req, res) => {
       THOMAS: 'Thomas',
       JOSH: 'Josh',
     }[voiceId] || 'Rachel';
-    const sampleText = `Yo! ${voiceName} here. Welcome to Vok AI.`;
+    const sampleText = `Yo!! ${voiceName} here. Welcome to Vok AI.`;
      
     console.log(`🎵 Generating voice sample for ${voiceId}: ${sampleText}`);
     console.log(`🔧 Environment: ${process.env.NODE_ENV}`);

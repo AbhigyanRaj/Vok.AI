@@ -13,10 +13,10 @@ const Modal: React.FC<ModalProps> = ({ open, onClose, children }) => {
       <div className="relative bg-zinc-900 rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 animate-fade-in border border-white/10">
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 text-zinc-400 hover:text-white focus:outline-none"
+          className="absolute top-2 right-2 text-zinc-400 hover:text-white focus:outline-none p-3 rounded-full hover:bg-zinc-800/70 transition-colors"
           aria-label="Close"
         >
-          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
         {children}
       </div>
@@ -24,4 +24,4 @@ const Modal: React.FC<ModalProps> = ({ open, onClose, children }) => {
   );
 };
 
-export default Modal; 
+export default Modal;

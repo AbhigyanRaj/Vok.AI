@@ -335,20 +335,20 @@ export async function generateAndSaveAudio(text, voiceType = 'RACHEL', audioType
 
 // Function to get the appropriate base URL
 function getBaseUrl() {
-  // Check if we're in production (Render) - multiple ways to detect
-  if (process.env.NODE_ENV === 'production' || 
-      process.env.RENDER || 
-      process.env.BASE_URL?.includes('onrender.com') ||
-      process.env.BASE_URL?.includes('vercel.app')) {
-    return process.env.BASE_URL || 'https://vok-ai.onrender.com';
-  }
-  
-  // Check if BASE_URL is explicitly set (for testing)
+  // Always use BASE_URL if it's set (ngrok, production, etc.)
   if (process.env.BASE_URL) {
+    console.log('🌐 Using BASE_URL:', process.env.BASE_URL);
     return process.env.BASE_URL;
   }
   
+  // Check if we're in production (Render) - multiple ways to detect
+  if (process.env.NODE_ENV === 'production' || 
+      process.env.RENDER) {
+    return 'https://vok-ai.onrender.com';
+  }
+  
   // Default to localhost for development
+  console.log('🌐 Using localhost fallback');
   return 'http://localhost:5001';
 }
 

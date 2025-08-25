@@ -79,7 +79,11 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
         const apiUrl = `${API_BASE_URL}/calls/voices/sample?voice=${voiceId}`;
         console.log(`🎵 Getting audio URL from: ${apiUrl}`);
         
-        const response = await fetch(apiUrl);
+        const response = await fetch(apiUrl, {
+          headers: {
+            'ngrok-skip-browser-warning': 'true'
+          }
+        });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -122,7 +126,53 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
       console.log(`🎵 Playing voice sample for ${voiceId}: ${audioUrl}`);
       
       // Create and play audio from the static file endpoint
-      const audio = new Audio(audioUrl);
+      const audio = new Audio();
+      
+      // Always fetch with proper headers for better compatibility
+      try {
+        console.log(`🔄 Fetching audio for ${voiceId} from: ${audioUrl}`);
+        
+        const response = await fetch(audioUrl, {
+          headers: {
+            'ngrok-skip-browser-warning': 'true',
+            'Accept': 'audio/mpeg,audio/*,*/*'
+          },
+          mode: 'cors',
+          credentials: 'omit'
+        });
+        
+        console.log(`📡 Response status for ${voiceId}:`, response.status, response.statusText);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        console.log(`📦 Blob created for ${voiceId}, size:`, blob.size, 'type:', blob.type);
+        
+        const blobUrl = URL.createObjectURL(blob);
+        audio.src = blobUrl;
+        
+        // Clean up blob URL after audio ends
+        audio.addEventListener('ended', () => {
+          URL.revokeObjectURL(blobUrl);
+        });
+        
+      } catch (fetchError: any) {
+        console.error(`❌ Failed to fetch audio for ${voiceId}:`, fetchError);
+        console.log(`🔄 Trying direct audio loading as fallback for ${voiceId}`);
+        
+        // Fallback: Try direct audio loading without fetch
+        try {
+          audio.src = audioUrl;
+          audio.crossOrigin = 'anonymous';
+        } catch (directError) {
+          console.error(`❌ Direct audio loading also failed for ${voiceId}:`, directError);
+          setPlayingVoice(null);
+          setError(`Failed to load voice preview for ${voiceId}. Please try again.`);
+          return;
+        }
+      }
       
       audio.onended = () => {
         console.log(`✅ Voice sample finished playing for ${voiceId}`);

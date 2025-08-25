@@ -5,7 +5,7 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
 // API service for backend communication
 export const api = {
   // Call management - AUTH REQUIRED
-  async initiateCall(token: string, moduleId: string, phoneNumber: string, customerName: string) {
+  async initiateCall(token: string, moduleId: string, phoneNumber: string, customerName: string, selectedVoice?: string) {
     const response = await fetch(`${API_BASE_URL}/calls/initiate`, {
       method: 'POST',
       headers: {
@@ -16,6 +16,7 @@ export const api = {
         moduleId,
         phoneNumber,
         customerName,
+        selectedVoice, // Add the selectedVoice parameter to the request body
       }),
     });
     return response.json();
@@ -81,4 +82,4 @@ export const setStoredToken = (token: string) => {
 
 export const removeStoredToken = () => {
   localStorage.removeItem('vokai_token');
-}; 
+};
