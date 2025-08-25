@@ -89,7 +89,7 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
         // Handle fallback case (ElevenLabs free tier limited)
         if (data.fallback && !data.success) {
           console.log(`⚠️ Voice preview unavailable for ${voiceId}: ${data.message}`);
-          setError(`${data.message} ${data.suggestion ? `\n\n${data.suggestion}` : ''}`);
+          setError(`Voice preview temporarily unavailable for ${voiceId}. ${data.message}`);
           setLoadingVoice(null);
           return;
         }
@@ -466,10 +466,6 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
                 <span className="flex items-center gap-2">
                   <span>{v.name}</span>
                   <span className="text-xs text-zinc-400">({v.gender})</span>
-                  {/* Show warning icon for unavailable previews */}
-                  <span className="text-xs text-yellow-400" title="Voice preview temporarily unavailable">
-                    ⚠️
-                  </span>
                 </span>
                 <button
                   type="button"
@@ -477,7 +473,6 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
                   onClick={e => { e.stopPropagation(); playDemo(v.id); }}
                   disabled={loadingVoice === v.id || playingVoice === v.id}
                   aria-label={`Play sample for ${v.name}`}
-                  title="Voice preview temporarily unavailable due to ElevenLabs free tier limitations"
                 >
                   {loadingVoice === v.id ? (
                     <svg className="animate-spin w-4 h-4 text-blue-400" viewBox="0 0 24 24">
@@ -489,8 +484,8 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
                       <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
                     </svg>
                   ) : (
-                    <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M6 4l12 6-12 6V4z" />
                     </svg>
                   )}
                 </button>

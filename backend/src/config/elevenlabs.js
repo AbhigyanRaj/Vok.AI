@@ -398,35 +398,16 @@ export async function generateAndSaveAudioWithFallback(text, voiceType = 'RACHEL
     
     try {
       // Try to generate Twilio TTS as fallback
-      const twilioResult = await generateTwilioTTSFallback(text, voiceType, audioType);
+      const twilioAudioUrl = await generateTwilioTTSFallback(text, voiceType, audioType);
       
-      // Check if Twilio fallback actually provided an audio URL
-      if (twilioResult && twilioResult.audioUrl && typeof twilioResult.audioUrl === 'string') {
-        return {
-          success: true,
-          audioUrl: twilioResult.audioUrl,
-          fallback: true,
-          message: 'Using Twilio TTS fallback due to ElevenLabs failure',
-          service: 'Twilio',
-          voiceType: voiceType
-        };
-      } else {
-        // Twilio fallback didn't provide a valid audio URL
-        log('WARN', 'Twilio fallback did not provide valid audio URL', { 
-          twilioResult, 
-          voiceType, 
-          audioType 
-        });
-        
-        return {
-          success: false,
-          fallback: true,
-          error: `ElevenLabs failed and Twilio fallback incomplete: ${error.message}`,
-          message: 'Voice generation failed - fallback system incomplete',
-          service: 'None',
-          voiceType: voiceType
-        };
-      }
+      return {
+        success: true,
+        audioUrl: twilioAudioUrl,
+        fallback: true,
+        message: 'Using Twilio TTS fallback due to ElevenLabs failure',
+        service: 'Twilio',
+        voiceType: voiceType
+      };
     } catch (twilioError) {
       log('ERROR', 'Both ElevenLabs and Twilio TTS failed', { 
         elevenLabsError: error.message,
