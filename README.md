@@ -1,8 +1,6 @@
 <div align="center">
   <img src="frontend/public/logo.png" alt="Vok.AI Logo" width="120"/>
   
-  # Vok.AI
-  
   **🎙️ Voice-powered communication & productivity platform**
   
   *Automated calling with AI-powered transcription & analytics*
