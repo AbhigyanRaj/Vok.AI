@@ -2,7 +2,7 @@
   <img src="frontend/public/logo.png" alt="Vok.AI Logo" width="120"/>
 
   # Vok.AI
->>>>>>> 71d8eea (feat: Implement voice preview caching system with direct MP3 file access)
+(feat: Implement voice preview caching system with direct MP3 file access)
   **🎙️ Voice-powered communication & productivity platform**
   
   *Automated calling with AI-powered transcription & analytics*
