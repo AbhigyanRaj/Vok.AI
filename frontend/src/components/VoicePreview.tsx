@@ -17,12 +17,12 @@ interface VoicePreviewProps {
 
 // Static voice data with direct MP3 URLs
 const VOICES: Voice[] = [
-  { key: 'RACHEL', name: 'Rachel', gender: 'female', sampleUrl: 'http://localhost:5001/sample-audio/rachel.mp3' },
-  { key: 'DOMI', name: 'Domi', gender: 'female', sampleUrl: 'http://localhost:5001/sample-audio/domi.mp3' },
-  { key: 'BELLA', name: 'Bella', gender: 'female', sampleUrl: 'http://localhost:5001/sample-audio/bella.mp3' },
-  { key: 'ANTONI', name: 'Antoni', gender: 'male', sampleUrl: 'http://localhost:5001/sample-audio/antoni.mp3' },
-  { key: 'THOMAS', name: 'Thomas', gender: 'male', sampleUrl: 'http://localhost:5001/sample-audio/thomas.mp3' },
-  { key: 'JOSH', name: 'Josh', gender: 'male', sampleUrl: 'http://localhost:5001/sample-audio/josh.mp3' }
+  { key: 'RACHEL', name: 'Rachel', gender: 'female', sampleUrl: '/audio/rachel.mp3' },
+  { key: 'DOMI', name: 'Domi', gender: 'female', sampleUrl: '/audio/domi.mp3' },
+  { key: 'BELLA', name: 'Bella', gender: 'female', sampleUrl: '/audio/bella.mp3' },
+  { key: 'ANTONI', name: 'Antoni', gender: 'male', sampleUrl: '/audio/antoni.mp3' },
+  { key: 'THOMAS', name: 'Thomas', gender: 'male', sampleUrl: '/audio/thomas.mp3' },
+  { key: 'JOSH', name: 'Josh', gender: 'male', sampleUrl: '/audio/josh.mp3' }
 ];
 
 const VoicePreview: React.FC<VoicePreviewProps> = ({ 

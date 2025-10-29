@@ -23,12 +23,12 @@ const CSV_TEMPLATE = "name,phone\nAbhigyan Raj,9234567890\nSandeep Mehta,9876543
 
 // List of voices with local MP3 files
 const ELEVENLABS_FREE_VOICES = [
-  { id: 'RACHEL', name: 'Rachel', gender: 'Female', demo: 'http://localhost:5001/sample-audio/rachel.mp3' },
-  { id: 'DOMI', name: 'Domi', gender: 'Female', demo: 'http://localhost:5001/sample-audio/domi.mp3' },
-  { id: 'BELLA', name: 'Bella', gender: 'Female', demo: 'http://localhost:5001/sample-audio/bella.mp3' },
-  { id: 'ANTONI', name: 'Antoni', gender: 'Male', demo: 'http://localhost:5001/sample-audio/antoni.mp3' },
-  { id: 'THOMAS', name: 'Thomas', gender: 'Male', demo: 'http://localhost:5001/sample-audio/thomas.mp3' },
-  { id: 'JOSH', name: 'Josh', gender: 'Male', demo: 'http://localhost:5001/sample-audio/josh.mp3' },
+  { id: 'RACHEL', name: 'Rachel', gender: 'Female', demo: '/audio/rachel.mp3' },
+  { id: 'DOMI', name: 'Domi', gender: 'Female', demo: '/audio/domi.mp3' },
+  { id: 'BELLA', name: 'Bella', gender: 'Female', demo: '/audio/bella.mp3' },
+  { id: 'ANTONI', name: 'Antoni', gender: 'Male', demo: '/audio/antoni.mp3' },
+  { id: 'THOMAS', name: 'Thomas', gender: 'Male', demo: '/audio/thomas.mp3' },
+  { id: 'JOSH', name: 'Josh', gender: 'Male', demo: '/audio/josh.mp3' },
 ];
 
 const LANGUAGES = [

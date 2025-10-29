@@ -9,27 +9,18 @@ import {
   CreditCard,
   Settings,
   Key,
-  Globe,
   Palette,
   Volume2,
-  Smartphone,
-  Mail,
-  Lock,
   Eye,
   EyeOff,
   Save,
   Download,
-  Upload,
   Trash2,
   LogOut,
-  HelpCircle,
-  Info,
-  CheckCircle,
   AlertCircle,
   BarChart3
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import * as auth from "../lib/auth";
 
 interface UserSettings {
   notifications: {
@@ -149,18 +140,26 @@ const SettingsPage: React.FC = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-3">Phone Number</label>
+            <label className="block text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
+              Phone Number
+              <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30">Coming Soon</Badge>
+            </label>
             <input
               type="tel"
-              className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-xl text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+              disabled
+              className="w-full px-4 py-3 bg-zinc-800/30 border border-zinc-700 rounded-xl text-zinc-400 placeholder-zinc-500 cursor-not-allowed"
               placeholder="+1 (555) 123-4567"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-3">Company</label>
+            <label className="block text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
+              Company
+              <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30">Coming Soon</Badge>
+            </label>
             <input
               type="text"
-              className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-xl text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+              disabled
+              className="w-full px-4 py-3 bg-zinc-800/30 border border-zinc-700 rounded-xl text-zinc-400 placeholder-zinc-500 cursor-not-allowed"
               placeholder="Enter your company name"
             />
           </div>
@@ -184,31 +183,34 @@ const SettingsPage: React.FC = () => {
             <div className="text-sm text-zinc-400">Tokens Remaining</div>
           </div>
           <div className="text-center p-6 bg-zinc-800/50 rounded-xl hover:bg-zinc-800/70 transition-all duration-200">
-            <div className="text-3xl font-bold text-zinc-100 mb-2 capitalize">{user?.subscription || 'Free'}</div>
+            <div className="text-3xl font-bold text-zinc-100 mb-2 capitalize">{typeof user?.subscription === 'string' ? user.subscription : user?.subscription?.tier || 'Free'}</div>
             <div className="text-sm text-zinc-400">Plan</div>
           </div>
         </div>
       </Card>
 
       <Card className="bg-zinc-900/50 border-zinc-800 p-6 sm:p-8 hover:bg-zinc-900/70 transition-all duration-200">
-        <div className="flex items-center mb-6">
-          <div className="p-2 bg-purple-500/20 rounded-lg mr-4">
-            <Download className="w-5 h-5 text-purple-400" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-purple-500/20 rounded-lg mr-4">
+              <Download className="w-5 h-5 text-purple-400" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Data Export</h3>
           </div>
-          <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Data Export</h3>
+          <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30">Coming Soon</Badge>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <button className="p-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-all duration-200 flex flex-col items-center justify-center">
-            <Download className="w-4 h-4 mb-2 text-gray-600" />
-            <span className="text-sm font-medium text-gray-900">Call History</span>
+          <button disabled className="p-3 bg-zinc-800/30 border border-zinc-700 rounded-lg cursor-not-allowed opacity-50 flex flex-col items-center justify-center">
+            <Download className="w-4 h-4 mb-2 text-zinc-500" />
+            <span className="text-sm font-medium text-zinc-400">Call History</span>
           </button>
-          <button className="p-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-all duration-200 flex flex-col items-center justify-center">
-            <Download className="w-4 h-4 mb-2 text-gray-600" />
-            <span className="text-sm font-medium text-gray-900">Analytics Data</span>
+          <button disabled className="p-3 bg-zinc-800/30 border border-zinc-700 rounded-lg cursor-not-allowed opacity-50 flex flex-col items-center justify-center">
+            <Download className="w-4 h-4 mb-2 text-zinc-500" />
+            <span className="text-sm font-medium text-zinc-400">Analytics Data</span>
           </button>
-          <button className="p-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-all duration-200 flex flex-col items-center justify-center">
-            <Download className="w-4 h-4 mb-2 text-gray-600" />
-            <span className="text-sm font-medium text-gray-900">Voice Modules</span>
+          <button disabled className="p-3 bg-zinc-800/30 border border-zinc-700 rounded-lg cursor-not-allowed opacity-50 flex flex-col items-center justify-center">
+            <Download className="w-4 h-4 mb-2 text-zinc-500" />
+            <span className="text-sm font-medium text-zinc-400">Voice Modules</span>
           </button>
         </div>
       </Card>
@@ -258,21 +260,34 @@ const SettingsPage: React.FC = () => {
   const renderNotificationsTab = () => (
     <div className="space-y-6">
       <Card className="bg-zinc-900/50 border-zinc-800 p-6 sm:p-8 hover:bg-zinc-900/70 transition-all duration-200">
-        <div className="flex items-center mb-6">
-          <div className="p-2 bg-yellow-500/20 rounded-lg mr-4">
-            <Bell className="w-5 h-5 text-yellow-400" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-yellow-500/20 rounded-lg mr-4">
+              <Bell className="w-5 h-5 text-yellow-400" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Notification Preferences</h3>
           </div>
-          <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Notification Preferences</h3>
+          <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/30">Partial</Badge>
         </div>
         <div className="space-y-6">
           {Object.entries(settings.notifications).map(([key, value]) => (
             <div key={key} className="flex items-center justify-between p-4 bg-zinc-800/30 rounded-xl hover:bg-zinc-800/50 transition-all duration-200">
               <div className="flex-1">
                 <div className="text-zinc-100 font-medium capitalize mb-1">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
-                <div className="text-sm text-zinc-400">
+                <div className="text-sm text-zinc-400 flex items-center gap-2">
                   {key === 'email' && 'Receive notifications via email'}
-                  {key === 'sms' && 'Receive notifications via SMS'}
-                  {key === 'push' && 'Receive push notifications'}
+                  {key === 'sms' && (
+                    <>
+                      Receive notifications via SMS
+                      <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30">Soon</Badge>
+                    </>
+                  )}
+                  {key === 'push' && (
+                    <>
+                      Receive push notifications
+                      <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30">Soon</Badge>
+                    </>
+                  )}
                   {key === 'callReminders' && 'Get reminded about scheduled calls'}
                   {key === 'weeklyReports' && 'Receive weekly analytics reports'}
                 </div>
@@ -299,11 +314,14 @@ const SettingsPage: React.FC = () => {
   const renderPrivacyTab = () => (
     <div className="space-y-6">
       <Card className="bg-zinc-900/50 border-zinc-800 p-6 sm:p-8 hover:bg-zinc-900/70 transition-all duration-200">
-        <div className="flex items-center mb-6">
-          <div className="p-2 bg-green-500/20 rounded-lg mr-4">
-            <Shield className="w-5 h-5 text-green-400" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-green-500/20 rounded-lg mr-4">
+              <Shield className="w-5 h-5 text-green-400" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Privacy Settings</h3>
           </div>
-          <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Privacy Settings</h3>
+          <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30">Coming Soon</Badge>
         </div>
         <div className="space-y-6">
           {Object.entries(settings.privacy).map(([key, value]) => (
@@ -338,11 +356,14 @@ const SettingsPage: React.FC = () => {
   const renderPreferencesTab = () => (
     <div className="space-y-6">
       <Card className="bg-zinc-900/50 border-zinc-800 p-6 sm:p-8 hover:bg-zinc-900/70 transition-all duration-200">
-        <div className="flex items-center mb-6">
-          <div className="p-2 bg-purple-500/20 rounded-lg mr-4">
-            <Palette className="w-5 h-5 text-purple-400" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-purple-500/20 rounded-lg mr-4">
+              <Palette className="w-5 h-5 text-purple-400" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Display & Language</h3>
           </div>
-          <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Display & Language</h3>
+          <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30">Coming Soon</Badge>
         </div>
         <div className="space-y-6">
           <div>
@@ -400,16 +421,22 @@ const SettingsPage: React.FC = () => {
   const renderSecurityTab = () => (
     <div className="space-y-6">
       <Card className="bg-zinc-900/50 border-zinc-800 p-6 sm:p-8 hover:bg-zinc-900/70 transition-all duration-200">
-        <div className="flex items-center mb-6">
-          <div className="p-2 bg-orange-500/20 rounded-lg mr-4">
-            <Key className="w-5 h-5 text-orange-400" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-orange-500/20 rounded-lg mr-4">
+              <Key className="w-5 h-5 text-orange-400" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Security Settings</h3>
           </div>
-          <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Security Settings</h3>
+          <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30">Coming Soon</Badge>
         </div>
         <div className="space-y-6">
           <div className="flex items-center justify-between p-4 bg-zinc-800/30 rounded-xl hover:bg-zinc-800/50 transition-all duration-200">
             <div className="flex-1">
-              <div className="text-zinc-100 font-medium mb-1">Two-Factor Authentication</div>
+              <div className="text-zinc-100 font-medium mb-1 flex items-center gap-2">
+                Two-Factor Authentication
+                <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30">Soon</Badge>
+              </div>
               <div className="text-sm text-zinc-400">Add an extra layer of security to your account</div>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -440,8 +467,14 @@ const SettingsPage: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-3">Change Password</label>
-            <div className="space-y-4">
+            <label className="block text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
+              Change Password
+              <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/30">OAuth Only</Badge>
+            </label>
+            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl mb-4">
+              <p className="text-sm text-blue-300">You're signed in with Google OAuth. Password management is handled by your Google account.</p>
+            </div>
+            <div className="space-y-4 opacity-50 pointer-events-none">
               <input
                 type={showPassword ? "text" : "password"}
                 className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-xl text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
@@ -476,11 +509,14 @@ const SettingsPage: React.FC = () => {
   const renderVoiceTab = () => (
     <div className="space-y-6">
       <Card className="bg-zinc-900/50 border-zinc-800 p-6 sm:p-8 hover:bg-zinc-900/70 transition-all duration-200">
-        <div className="flex items-center mb-6">
-          <div className="p-2 bg-pink-500/20 rounded-lg mr-4">
-            <Volume2 className="w-5 h-5 text-pink-400" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-pink-500/20 rounded-lg mr-4">
+              <Volume2 className="w-5 h-5 text-pink-400" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Voice Settings</h3>
           </div>
-          <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Voice Settings</h3>
+          <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30">Coming Soon</Badge>
         </div>
         <div className="space-y-6">
           <div>
@@ -547,15 +583,15 @@ const SettingsPage: React.FC = () => {
         </div>
         <div className="flex items-center justify-between p-6 bg-zinc-800/50 rounded-xl hover:bg-zinc-800/70 transition-all duration-200">
           <div>
-            <div className="text-zinc-100 font-medium capitalize text-lg mb-1">{user?.subscription || 'Free'} Plan</div>
+            <div className="text-zinc-100 font-medium capitalize text-lg mb-1">{typeof user?.subscription === 'string' ? user.subscription : user?.subscription?.tier || 'Free'} Plan</div>
             <div className="text-sm text-zinc-400">
-              {user?.subscription === 'free' && 'Basic features, limited calls'}
-              {user?.subscription === 'basic' && 'Standard features, 1000 calls/month'}
-              {user?.subscription === 'premium' && 'Advanced features, unlimited calls'}
+              {(typeof user?.subscription === 'string' ? user.subscription : user?.subscription?.tier) === 'free' && 'Basic features, limited calls'}
+              {(typeof user?.subscription === 'string' ? user.subscription : user?.subscription?.tier) === 'basic' && 'Standard features, 1000 calls/month'}
+              {(typeof user?.subscription === 'string' ? user.subscription : user?.subscription?.tier) === 'premium' && 'Advanced features, unlimited calls'}
             </div>
           </div>
           <Badge variant="outline" className="text-xs px-3 py-1">
-            {user?.subscription === 'free' ? 'Free' : 'Active'}
+            {(typeof user?.subscription === 'string' ? user.subscription : user?.subscription?.tier) === 'free' ? 'Free' : 'Active'}
           </Badge>
         </div>
       </Card>
@@ -580,24 +616,26 @@ const SettingsPage: React.FC = () => {
       </Card>
 
       <Card className="bg-zinc-900/50 border-zinc-800 p-6 sm:p-8 hover:bg-zinc-900/70 transition-all duration-200">
-        <div className="flex items-center mb-6">
-          <div className="p-2 bg-purple-500/20 rounded-lg mr-4">
-            <CreditCard className="w-5 h-5 text-purple-400" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-purple-500/20 rounded-lg mr-4">
+              <CreditCard className="w-5 h-5 text-purple-400" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Payment Methods</h3>
           </div>
-          <h3 className="text-lg sm:text-xl font-semibold text-zinc-100">Payment Methods</h3>
+          <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30">Coming Soon</Badge>
         </div>
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl hover:bg-zinc-800/70 transition-all duration-200">
+          <div className="flex items-center justify-between p-4 bg-zinc-800/30 rounded-xl opacity-50">
             <div className="flex items-center">
-              <CreditCard className="w-6 h-6 text-blue-400 mr-4" />
+              <CreditCard className="w-6 h-6 text-zinc-500 mr-4" />
               <div>
-                <div className="text-zinc-100 font-medium">•••• •••• •••• 4242</div>
-                <div className="text-sm text-zinc-400">Expires 12/25</div>
+                <div className="text-zinc-400 font-medium">No payment methods</div>
+                <div className="text-sm text-zinc-500">Payment integration coming soon</div>
               </div>
             </div>
-            <Badge variant="outline" className="text-xs px-3 py-1">Default</Badge>
           </div>
-          <Button variant="outline" className="w-full sm:w-auto px-6 py-3 rounded-xl hover:bg-purple-500/10 hover:border-purple-500/50 transition-all duration-200">
+          <Button disabled variant="outline" className="w-full sm:w-auto px-6 py-3 rounded-xl opacity-50 cursor-not-allowed">
             <CreditCard className="w-4 h-4 mr-2" />
             Add Payment Method
           </Button>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import * as auth from "../lib/auth";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
 import { Plus, Layers, Trash2, Pencil, X, Check, Loader2, Phone, Play } from "lucide-react";
 
 type QuestionObject = {
@@ -271,23 +272,17 @@ const ModulesPage: React.FC = () => {
                   
                   {selectedModule === mod.id && (
                     <div className="flex items-center gap-2">
-                      <button
-                        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-zinc-100 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-lg shadow-green-500/25"
-                        onClick={() => handleUseModule(mod)}
-                        title="Use Module"
-                      >
-                        <Play className="w-4 h-4" />
-                        Use
-                      </button>
-                      
-                      <button
-                        className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-zinc-100 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-lg shadow-purple-500/25"
-                        onClick={() => handleStartCall(mod)}
-                        title="Start Call"
-                      >
-                        <Phone className="w-4 h-4" />
-                        Call
-                      </button>
+                      <div className="relative">
+                        <button
+                          disabled
+                          className="flex items-center gap-2 bg-zinc-700 text-zinc-400 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed opacity-60"
+                          title="Bulk calling coming soon"
+                        >
+                          <Phone className="w-4 h-4" />
+                          Bulk Call
+                        </button>
+                        <Badge variant="outline" className="absolute -top-2 -right-2 text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/30 px-1.5 py-0.5">Soon</Badge>
+                      </div>
                     </div>
                   )}
                 </div>
