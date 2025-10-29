@@ -30,8 +30,12 @@ interface CallData {
   responses?: Map<string, string>;
   transcription?: string;
   evaluation?: {
-    result: 'YES' | 'NO' | 'MAYBE';
+    result: 'YES' | 'NO' | 'MAYBE' | 'INVESTIGATION_REQUIRED';
     comments: string[];
+  };
+  module?: {
+    name: string;
+    _id: string;
   };
   summary?: string;
   callType?: 'individual' | 'bulk';
@@ -190,9 +194,9 @@ const AnalyticsPage: React.FC = () => {
         .sort((a: CallData, b: CallData) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 10);
 
-      // Calculate result distribution (Yes/No/Maybe)
+      // Calculate result distribution (Yes/No/Maybe) - include all calls with evaluation results
       const completedCallsWithResults = filteredCalls.filter((call: CallData) => 
-        call.status === 'completed' && call.evaluation?.result
+        call.evaluation?.result
       );
       
       const yesCount = completedCallsWithResults.filter((call: CallData) => 
@@ -218,7 +222,7 @@ const AnalyticsPage: React.FC = () => {
       const moduleWiseResults: { [key: string]: { yes: number; no: number; maybe: number; total: number } } = {};
       
       completedCallsWithResults.forEach((call: CallData) => {
-        const moduleName = call.moduleName || 'Unknown';
+        const moduleName = call.module?.name || 'Unknown Module';
         if (!moduleWiseResults[moduleName]) {
           moduleWiseResults[moduleName] = { yes: 0, no: 0, maybe: 0, total: 0 };
         }

@@ -667,13 +667,13 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       const gather = twimlResponse.gather({
         input: 'speech',
         action: nextUrl.toString(),
-        timeout: 12,
+        timeout: 3,
         method: 'POST',
-        speechTimeout: 'auto',
+        speechTimeout: 1.5,
         speechModel: 'experimental_conversations',
         enhanced: true,
         language: 'en-US',
-        hints: 'yes,no,okay,sure,go ahead,yeah,hmm,uh huh,alright,fine,good,great'
+        hints: 'yes,no,okay,sure,go ahead,yeah,hmm,uh huh,alright,fine,good,great,interested,not interested,maybe,definitely,absolutely,never,sounds good'
       });
 
     } else if (step === 1) {
@@ -681,9 +681,15 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       const callId = req.query.callId || req.body.callId || `webhook_${Date.now()}`;
       
       if (previousResponse && previousResponse.trim().length > 0) {
-        // Customer responded - check if positive
-        if (['yes', 'okay', 'sure', 'go ahead', 'yeah', 'hmm', 'uh huh', 'alright', 'fine', 'good', 'great'].some(word => 
-          previousResponse.toLowerCase().includes(word))) {
+        // Customer responded - check if positive (more flexible matching)
+        const positiveWords = ['yes', 'okay', 'sure', 'go ahead', 'yeah', 'yep', 'yup', 'hmm', 'uh huh', 'alright', 'fine', 'good', 'great', 'sounds good', 'perfect'];
+        const negativeWords = ['no', 'not now', 'busy', 'later', 'bad time', 'cannot', 'can\'t'];
+        
+        const responseText = previousResponse.toLowerCase().trim();
+        const isPositive = positiveWords.some(word => responseText.includes(word));
+        const isNegative = negativeWords.some(word => responseText.includes(word));
+        
+        if (isPositive && !isNegative) {
           
           console.log('\n✅ CUSTOMER CONFIRMED AVAILABILITY!');
           console.log('🎯 Moving to questions...');
@@ -698,7 +704,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
             moduleId
           );
           
-          twimlResponse.pause({ length: 0.5 });
+          twimlResponse.pause({ length: 0.1 });
 
           const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
           nextUrl.searchParams.set('moduleId', moduleId);
@@ -711,12 +717,13 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           const gather = twimlResponse.gather({
             input: 'speech',
             action: nextUrl.toString(),
-            timeout: 20,
+            timeout: 3,
             method: 'POST',
-            speechTimeout: 'auto',
+            speechTimeout: 1.5,
             speechModel: 'experimental_conversations',
             enhanced: true,
-            language: 'en-US'
+            language: 'en-US',
+            hints: 'yes,no,okay,sure,interested,not interested,maybe,definitely,absolutely,never,sounds good,great,fine,alright'
           });
           
           // Use smart hybrid for the first question (HIGH PRIORITY)
@@ -881,7 +888,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           moduleId
         );
         
-        twimlResponse.pause({ length: 1 });
+        twimlResponse.pause({ length: 0.2 });
         
         // Use smart hybrid for final message
         await generateSmartAudio(
@@ -924,12 +931,13 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         const gather = twimlResponse.gather({
           input: 'speech',
           action: nextUrl.toString(),
-          timeout: 20,
+          timeout: 3,
           method: 'POST',
-          speechTimeout: 'auto',
+          speechTimeout: 1.5,
           speechModel: 'experimental_conversations',
           enhanced: true,
-          language: 'en-US'
+          language: 'en-US',
+          hints: 'yes,no,okay,sure,interested,not interested,maybe,definitely,absolutely,never,sounds good,great,fine,alright'
         });
         
         // Use smart hybrid for the question
