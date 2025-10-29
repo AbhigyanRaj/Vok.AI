@@ -13,6 +13,7 @@
     "fix-database": "node scripts/fix-database.js"
   },
   "dependencies": {
+    "@deepgram/sdk": "^4.11.2",
     "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -24,7 +25,8 @@
     "mongoose": "^8.0.0",
     "node-fetch": "^3.3.2",
     "openai": "^4.20.0",
-    "twilio": "^4.19.0"
+    "twilio": "^4.19.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "jest": "^29.7.0",

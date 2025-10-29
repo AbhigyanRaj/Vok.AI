@@ -1,0 +1,435 @@
+VOK.AI - PIPELINE FLOW
+====================================
+
+                                    ┌─────────────┐
+                                    │    START    │
+                                    │   (User)    │
+                                    └──────┬──────┘
+                                           │
+                                           ▼
+                                    ┌─────────────┐
+                                    │   Google    │
+                                    │   OAuth     │
+                                    └──────┬──────┘
+                                           │
+                                           ▼
+                                    ┌─────────────┐
+                                    │ JWT Token   │
+                                    │ Generated   │
+                                    └──────┬──────┘
+                                           │
+                                           ▼
+                                    ┌─────────────┐
+                                    │  Dashboard  │
+                                    │   Landing   │
+                                    └──────┬──────┘
+                                           │
+                                           ▼
+                              ┌─────────────────────────┐
+                              │     MODULE CHOICE       │
+                              └─────────┬───────────────┘
+                                        │
+                        ┌───────────────┼───────────────┐
+                        ▼               ▼               ▼
+                ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+                │ Create New  │ │ Use Existing│ │   Manage    │
+                │   Module    │ │   Module    │ │  Modules    │
+                └──────┬──────┘ └──────┬──────┘ └─────────────┘
+                       │               │
+                       ▼               │
+                ┌─────────────┐        │
+                │ Module Name │        │
+                │ & Type      │        │
+                └──────┬──────┘        │
+                       │               │
+                       ▼               │
+                ┌─────────────┐        │
+                │ Add Q1, Q2  │        │
+                │ Q3, Q4...   │        │
+                └──────┬──────┘        │
+                       │               │
+                       ▼               │
+                ┌─────────────┐        │
+                │ Save to DB  │        │
+                │ (MongoDB)   │        │
+                └──────┬──────┘        │
+                       │               │
+                       └───────┬───────┘
+                               │
+                               ▼
+                        ┌─────────────┐
+                        │ Select      │
+                        │ Module      │
+                        └──────┬──────┘
+                               │
+                               ▼
+                        ┌─────────────┐
+                        │ Enter Phone │
+                        │ Number      │
+                        └──────┬──────┘
+                               │
+                               ▼
+                        ┌─────────────┐
+                        │ Token Check │◄──── Insufficient Tokens
+                        │ (5 tokens)  │      ┌─────────────┐
+                        └──────┬──────┘      │ Buy Tokens  │
+                               │             │ [COMING]    │
+                               ▼             └─────────────┘
+                        ┌─────────────┐
+                        │ Deduct      │
+                        │ Tokens      │
+                        └──────┬──────┘
+                               │
+                               ▼
+                        ┌─────────────┐
+                        │ Generate    │
+                        │ Call Record │
+                        └──────┬──────┘
+                               │
+                               ▼
+                        ┌─────────────┐      ┌─────────────┐
+                        │ ElevenLabs  │◄─────┤ Rate Limit  │
+                        │ TTS Audio   │      │ 3 req/call  │
+                        │ Generation  │      └─────────────┘
+                        └──────┬──────┘
+                               │ Fallback if failed
+                               ▼
+                        ┌─────────────┐
+                        │   Twilio    │
+                        │ TTS Backup  │
+                        └──────┬──────┘
+                               │
+                               ▼
+                        ┌─────────────┐
+                        │   Twilio    │
+                        │ Outbound    │
+                        │ Call        │
+                        └──────┬──────┘
+                               │
+                    ┌──────────┼──────────┐
+                    ▼          ▼          ▼
+            ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+            │ Call Failed │ │ Customer    │ │ No Answer/  │
+            │   Busy      │ │ Answers     │ │   Busy      │
+            └──────┬──────┘ └──────┬──────┘ └──────┬──────┘
+                   │               │               │
+                   │               ▼               │
+                   │        ┌─────────────┐        │
+                   │        │ Audio       │        │
+                   │        │ Recording   │        │
+                   │        │ Capture     │        │
+                   │        └──────┬──────┘        │
+                   │               │               │
+                   │               ▼               │
+                   │        ┌─────────────┐        │
+                   │        │ OpenAI      │        │
+                   │        │ Whisper STT │        │
+                   │        └──────┬──────┘        │
+                   │               │               │
+                   │               ▼               │
+                   │        ┌─────────────┐        │
+                   │        │ OpenAI GPT  │        │
+                   │        │ Analysis    │        │
+                   │        └──────┬──────┘        │
+                   │               │               │
+                   │               ▼               │
+                   │        ┌─────────────┐        │
+                   │        │ YES/NO/     │        │
+                   │        │ MAYBE       │        │
+                   │        │ Result      │        │
+                   │        └──────┬──────┘        │
+                   │               │               │
+                   └───────────────┼───────────────┘
+                                   │
+                                   ▼
+                            ┌─────────────┐
+                            │ Store Call  │
+                            │ Results in  │
+                            │  MongoDB    │
+                            └──────┬──────┘
+                                   │
+                                   ▼
+                            ┌─────────────┐
+                            │ Update User │
+                            │ Statistics  │
+                            └──────┬──────┘
+                                   │
+                                   ▼
+                            ┌─────────────┐
+                            │ Real-time   │
+                            │ Analytics   │
+                            │ Dashboard   │
+                            └──────┬──────┘
+                                   │
+                                   ▼
+                            ┌─────────────┐
+                            │     END     │
+                            │ (Complete)  │
+                            └─────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+                        UML GENERATOR DETAILED PROMPT
+═══════════════════════════════════════════════════════════════════════════════════
+
+Create a comprehensive UML Activity Diagram for the Vok.AI voice automation platform with the following EXACT specifications:
+
+## DIAGRAM STRUCTURE:
+- **Total Nodes**: 25 main process nodes + 8 decision nodes + 6 upcoming feature nodes = 39 total nodes
+- **Diagram Type**: UML Activity Diagram with swimlanes
+- **Orientation**: Top-to-bottom vertical flow
+- **Canvas Size**: 1200px width x 2000px height minimum
+
+## SWIMLANE CONFIGURATION:
+Create 5 vertical swimlanes with these exact labels and colors:
+1. **"User Interface"** - Light Blue (#E3F2FD) - Width: 200px
+2. **"Backend Services"** - Light Green (#E8F5E8) - Width: 250px  
+3. **"External APIs"** - Light Orange (#FFF3E0) - Width: 200px
+4. **"AI Processing"** - Light Purple (#F3E5F5) - Width: 200px
+5. **"Database Layer"** - Light Gray (#F5F5F5) - Width: 200px
+
+## NODE SPECIFICATIONS:
+
+### START/END NODES (2 nodes):
+- **Start Node**: Black filled circle (●) - 20px diameter - Position: Top center
+- **End Node**: Black filled circle with outer ring - 25px diameter - Position: Bottom center
+
+### PROCESS NODES (25 nodes):
+Use rounded rectangles (10px border radius) with these exact specifications:
+
+**Authentication Flow (3 nodes):**
+1. "Google OAuth Login" - Blue (#2196F3) - 150x60px - Swimlane: User Interface
+2. "JWT Token Generation" - Green (#4CAF50) - 150x60px - Swimlane: Backend Services  
+3. "Dashboard Landing" - Blue (#2196F3) - 150x60px - Swimlane: User Interface
+
+**Module Management (5 nodes):**
+4. "Create New Module" - Blue (#2196F3) - 150x60px - Swimlane: User Interface
+5. "Add Questions (Q1-Q4)" - Blue (#2196F3) - 150x60px - Swimlane: User Interface
+6. "Module Validation" - Green (#4CAF50) - 150x60px - Swimlane: Backend Services
+7. "Save to MongoDB" - Gray (#757575) - 150x60px - Swimlane: Database Layer
+8. "Generate Module ID" - Green (#4CAF50) - 150x60px - Swimlane: Backend Services
+
+**Call Initiation (4 nodes):**
+9. "Select Module" - Blue (#2196F3) - 150x60px - Swimlane: User Interface
+10. "Enter Phone Number" - Blue (#2196F3) - 150x60px - Swimlane: User Interface
+11. "Deduct 5 Tokens" - Green (#4CAF50) - 150x60px - Swimlane: Backend Services
+12. "Create Call Record" - Gray (#757575) - 150x60px - Swimlane: Database Layer
+
+**Voice Processing (6 nodes):**
+13. "ElevenLabs TTS Generation" - Orange (#FF9800) - 150x60px - Swimlane: External APIs
+14. "Twilio TTS Backup" - Orange (#FF9800) - 150x60px - Swimlane: External APIs
+15. "Twilio Outbound Call" - Orange (#FF9800) - 150x60px - Swimlane: External APIs
+16. "Audio Recording Capture" - Orange (#FF9800) - 150x60px - Swimlane: External APIs
+17. "OpenAI Whisper STT" - Purple (#9C27B0) - 150x60px - Swimlane: AI Processing
+18. "OpenAI GPT Analysis" - Purple (#9C27B0) - 150x60px - Swimlane: AI Processing
+
+**Data Processing (4 nodes):**
+19. "Generate YES/NO/MAYBE Result" - Purple (#9C27B0) - 150x60px - Swimlane: AI Processing
+20. "Store Call Results" - Gray (#757575) - 150x60px - Swimlane: Database Layer
+21. "Update User Statistics" - Gray (#757575) - 150x60px - Swimlane: Database Layer
+22. "Refresh Analytics Dashboard" - Blue (#2196F3) - 150x60px - Swimlane: User Interface
+
+**Error Handling (3 nodes):**
+23. "Rate Limit Check (3/call)" - Green (#4CAF50) - 150x60px - Swimlane: Backend Services
+24. "API Failure Detection" - Red (#F44336) - 150x60px - Swimlane: Backend Services
+25. "Graceful Error Handling" - Red (#F44336) - 150x60px - Swimlane: Backend Services
+
+### DECISION NODES (8 nodes):
+Use diamond shapes (◊) - 100x80px - Yellow (#FFEB3B):
+1. "Module Choice?" - 3 outgoing paths: Create New/Use Existing/Manage
+2. "Sufficient Tokens?" - 2 outgoing paths: Yes/Buy More Tokens
+3. "ElevenLabs Available?" - 2 outgoing paths: Yes/Use Twilio Backup
+4. "Call Connected?" - 3 outgoing paths: Success/Failed/No Answer
+5. "Audio Captured?" - 2 outgoing paths: Yes/Log Failed Call
+6. "STT Successful?" - 2 outgoing paths: Yes/Retry
+7. "Analysis Complete?" - 2 outgoing paths: Yes/Error
+8. "Store Successful?" - 2 outgoing paths: Yes/Retry
+
+### CONNECTION SPECIFICATIONS:
+- **Arrow Type**: Solid black arrows with 2px thickness
+- **Arrow Head**: 8px triangle
+- **Connection Style**: Orthogonal (90-degree angles only)
+- **Label Style**: 10px Arial font, black text on white background
+
+**Main Flow Connections (22 connections):**
+1. Start → Google OAuth Login
+2. Google OAuth Login → JWT Token Generation  
+3. JWT Token Generation → Dashboard Landing
+4. Dashboard Landing → Module Choice?
+5. Module Choice? → Create New Module [label: "Create"]
+6. Module Choice? → Select Module [label: "Use Existing"]  
+7. Create New Module → Add Questions
+8. Add Questions → Module Validation
+9. Module Validation → Save to MongoDB
+10. Save to MongoDB → Generate Module ID
+11. Generate Module ID → Select Module
+12. Select Module → Enter Phone Number
+13. Enter Phone Number → Sufficient Tokens?
+14. Sufficient Tokens? → Deduct 5 Tokens [label: "Yes"]
+15. Deduct 5 Tokens → Create Call Record
+16. Create Call Record → Rate Limit Check
+17. Rate Limit Check → ElevenLabs Available?
+18. ElevenLabs Available? → ElevenLabs TTS Generation [label: "Yes"]
+19. ElevenLabs Available? → Twilio TTS Backup [label: "No"]
+20. ElevenLabs TTS Generation → Twilio Outbound Call
+21. Twilio TTS Backup → Twilio Outbound Call
+22. Twilio Outbound Call → Call Connected?
+
+**Branching Connections (15 connections):**
+23. Call Connected? → Audio Recording Capture [label: "Success"]
+24. Call Connected? → Store Call Results [label: "Failed"]
+25. Call Connected? → Store Call Results [label: "No Answer"]
+26. Audio Recording Capture → Audio Captured?
+27. Audio Captured? → OpenAI Whisper STT [label: "Yes"]
+28. Audio Captured? → Store Call Results [label: "No"]
+29. OpenAI Whisper STT → STT Successful?
+30. STT Successful? → OpenAI GPT Analysis [label: "Yes"]
+31. STT Successful? → Store Call Results [label: "Failed"]
+32. OpenAI GPT Analysis → Analysis Complete?
+33. Analysis Complete? → Generate YES/NO/MAYBE Result [label: "Yes"]
+34. Analysis Complete? → Graceful Error Handling [label: "Error"]
+35. Generate YES/NO/MAYBE Result → Store Call Results
+36. Store Call Results → Store Successful?
+37. Store Successful? → Update User Statistics [label: "Yes"]
+
+**Final Connections (3 connections):**
+38. Update User Statistics → Refresh Analytics Dashboard
+39. Refresh Analytics Dashboard → End
+40. Graceful Error Handling → Store Call Results
+
+**Error/Fallback Connections (5 connections):**
+41. Sufficient Tokens? → Buy Tokens [label: "No"] - RED dashed line
+42. API Failure Detection → Graceful Error Handling - RED solid line
+43. Store Successful? → API Failure Detection [label: "No"] - RED dashed line
+44. Rate Limit Check → API Failure Detection - ORANGE dashed line
+45. Buy Tokens → Sufficient Tokens? - GREEN dashed line (loop back)
+
+## UPCOMING FEATURES SECTION:
+Create a separate box at the bottom with dashed border (Gray #BDBDBD):
+- **Title**: "🚧 UPCOMING FEATURES 🚧" - 16px bold font
+- **Box Size**: 1000x200px
+- **Background**: Light Yellow (#FFFDE7)
+
+**Feature Nodes (6 nodes):**
+1. "Bulk Call Processing" - Light Blue (#E1F5FE) - 180x50px
+2. "Advanced Analytics Export" - Light Green (#E8F5E8) - 180x50px  
+3. "Payment Gateway Integration" - Light Orange (#FFF3E0) - 180x50px
+4. "Custom Voice Settings" - Light Purple (#F3E5F5) - 180x50px
+5. "Two-Factor Authentication" - Light Red (#FFEBEE) - 180x50px
+6. "Mobile App Interface" - Light Cyan (#E0F2F1) - 180x50px
+
+## STYLING REQUIREMENTS:
+- **Font**: Arial, 11px for node text, 9px for connection labels
+- **Border Width**: 2px for all shapes
+- **Shadow**: 2px drop shadow (Gray #CCCCCC) for all nodes
+- **Grid**: Show 20px grid lines (Light Gray #EEEEEE)
+- **Background**: White (#FFFFFF)
+- **Title**: "VOK.AI - COMPLETE PIPELINE FLOW" - 20px bold, center-aligned
+
+## LAYOUT POSITIONING:
+- **Vertical Spacing**: 100px between node rows
+- **Horizontal Spacing**: 50px between nodes in same row  
+- **Swimlane Spacing**: 20px padding inside each lane
+- **Decision Node Offset**: 25px right from main flow line
+- **Error Nodes**: Right side of diagram with red connecting lines
+
+Generate this exact UML diagram with all specified nodes, connections, colors, and positioning. Ensure all 39 nodes are included and properly connected according to the Vok.AI pipeline flow.
+
+┌═════════════════════════════════════════════════════════════════════════════════┐
+║                            🚧 UPCOMING FEATURES 🚧                             ║
+╚═════════════════════════════════════════════════════════════════════════════════╝
+
+──────────────────────────────────────────────────────────────────────────────────
+SIMPLE UML GENERATOR PROMPT (Minimal, Canvas-Ready)
+──────────────────────────────────────────────────────────────────────────────────
+
+Goal: Generate a simple UML Activity Diagram that shows how the user interacts with Vok.AI and how the system behaves internally during a single call flow. Keep it minimal and easy to place on a canvas.
+
+Diagram type: UML Activity Diagram
+Orientation: Top-to-bottom
+Swimlanes: 3 lanes only
+- User (UI)
+- Backend
+- External Services (Twilio, ElevenLabs, OpenAI)
+
+Nodes (use rounded rectangles; diamonds only for decisions):
+1) Start (solid circle)
+2) Sign in with Google (User)
+3) Load Dashboard (User)
+4) Create/Select Module (User)
+5) Enter Phone Number (User)
+6) Check Tokens (Backend)
+7) Deduct 5 Tokens (Backend)
+8) Generate TTS Prompt (ElevenLabs) (External)
+9) Place Outbound Call (Twilio) (External)
+10) Ask Question N (Twilio) (External)
+11) Capture Answer Audio (Twilio) (External)
+12) Transcribe Answer (OpenAI Whisper) (External)
+13) Save Answer (Backend)
+14) More Questions? (Decision)
+15) Next Question (loop back to 10) (External)
+16) Summarize Call (OpenAI GPT) (External)
+17) Store Summary & Results (Backend)
+18) Show Results/Analytics (User)
+19) End (bullseye)
+
+Connections (simple, straight arrows):
+Start → Sign in with Google → Load Dashboard → Create/Select Module → Enter Phone Number → Check Tokens
+Check Tokens → [Enough] → Deduct 5 Tokens → Generate TTS Prompt → Place Outbound Call → Ask Question N → Capture Answer Audio → Transcribe Answer → Save Answer → More Questions?
+More Questions? → [Yes] → Next Question → Ask Question N (loop)
+More Questions? → [No] → Summarize Call → Store Summary & Results → Show Results/Analytics → End
+
+Minimal error handling (dashed arrows, optional):
+- Check Tokens → [Not enough] → Prompt Buy Tokens (User) → Check Tokens
+- Place Outbound Call → [Failed/No Answer] → Store Summary & Results → Show Results/Analytics
+
+Styling: Keep default fonts/colors. Only three lanes, minimal labels. Avoid extra boxes beyond those listed above.
+
+
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│ BULK CALLS  │    │ ADVANCED    │    │ PAYMENT     │    │ VOICE       │
+│ [COMING]    │    │ ANALYTICS   │    │ GATEWAY     │    │ SETTINGS    │
+│             │    │ [COMING]    │    │ [COMING]    │    │ [COMING]    │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+       │                   │                   │                   │
+       ▼                   ▼                   ▼                   ▼
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│ CSV Upload  │    │ Export      │    │ Stripe      │    │ Custom TTS  │
+│ Contact     │    │ Data        │    │ Integration │    │ Voice       │
+│ Lists       │    │ Reports     │    │ Billing     │    │ Selection   │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│ 2FA AUTH    │    │ PRIVACY     │    │ THEMES &    │    │ MOBILE      │
+│ [COMING]    │    │ CONTROLS    │    │ LANGUAGES   │    │ APP         │
+│             │    │ [COMING]    │    │ [COMING]    │    │ [COMING]    │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              TECH STACK OVERVIEW                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Frontend: React 19 + TypeScript + Vite + Tailwind CSS
+Backend:  Node.js + Express + MongoDB + Mongoose
+Auth:     Google OAuth + JWT Tokens
+Voice:    Twilio Voice API + ElevenLabs TTS
+AI:       OpenAI Whisper (STT) + GPT-4 (Analysis)
+Deploy:   Frontend (Vercel) + Backend (Render) + DB (MongoDB Atlas)
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                ERROR HANDLING                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│ API Failure │───▶│ Fallback    │───▶│ User        │───▶│ Retry       │
+│ Detection   │    │ Mechanisms  │    │ Notification│    │ Logic       │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+       │                   │                   │                   │
+       ▼                   ▼                   ▼                   ▼
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│ ElevenLabs  │    │ Twilio TTS  │    │ Error Logs  │    │ Graceful    │
+│ → Twilio    │    │ Backup      │    │ & Tracking  │    │ Degradation │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════
+                            END OF PIPELINE FLOW
+═══════════════════════════════════════════════════════════════════════════════════

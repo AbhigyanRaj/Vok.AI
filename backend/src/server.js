@@ -27,9 +27,12 @@ import authRoutes from './routes/auth.js';
 import moduleRoutes from './routes/modules.js';
 import callRoutes from './routes/calls.js';
 import userRoutes from './routes/users.js';
+import { setupMediaStreamWebSocket } from './routes/mediaStream.js';
+import http from 'http';
 
 
 const app = express();
+const httpServer = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
 // Debug: Check if environment variables are loaded
@@ -122,11 +125,15 @@ const startServer = async () => {
       console.log('⚠️ ElevenLabs API key not set - skipping audio library initialization');
     }
     
+    // Initialize WebSocket server for Media Streams
+    setupMediaStreamWebSocket(httpServer);
+    
     // Start the server
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
       console.log(`📊 Database Status: ${getDBStatus()}`);
+      console.log(`🎤 WebSocket server ready for Twilio Media Streams`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

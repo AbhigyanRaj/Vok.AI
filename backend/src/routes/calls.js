@@ -1,6 +1,6 @@
 import express from 'express';
 import { validateTwilioRequest } from '../config/twilio.js';
-import { createTwiMLResponse } from '../utils/twimlHelpers.js';
+import { createTwiMLResponse, addMediaStream } from '../utils/twimlHelpers.js';
 import { analyzeResponseWithGemini } from '../config/openai.js';
 import { formatPhoneNumber, validatePhoneNumber } from '../utils/phoneUtils.js';
 import { 
@@ -636,6 +636,9 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       moduleId: moduleId
     });
 
+    // Enable streaming for real-time transcription
+    const enableStreaming = process.env.DEEPGRAM_API_KEY && process.env.DEEPGRAM_API_KEY.length > 0;
+    
     // Handle different steps of the call
     if (step === 0) {
       // Initial greeting - Use smart hybrid system
@@ -643,6 +646,12 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       
       // Generate call ID for tracking
       const callId = `webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Add Media Stream for real-time transcription if enabled
+      if (enableStreaming && call) {
+        addMediaStream(twimlResponse, call.twilioCallSid);
+        console.log('🎤 Streaming enabled for real-time transcription');
+      }
       
       // Use smart hybrid for greeting (HIGH PRIORITY)
       await generateSmartAudio(
