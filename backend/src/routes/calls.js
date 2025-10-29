@@ -79,16 +79,16 @@ async function analyzeCustomerResponse(response, question) {
 
 // Configuration - Smart Hybrid System
 const HYBRID_CONFIG = {
-  // ElevenLabs usage limits to prevent abuse detection
-  MAX_ELEVENLABS_PER_CALL: 3,
-  MAX_ELEVENLABS_PER_MINUTE: 5,
-  MAX_ELEVENLABS_PER_HOUR: 20,
+  // Disable ElevenLabs temporarily (account flagged on Render)
+  MAX_ELEVENLABS_PER_CALL: 0, // Disabled
+  MAX_ELEVENLABS_PER_MINUTE: 0,
+  MAX_ELEVENLABS_PER_HOUR: 0,
   
   // Priority system for ElevenLabs usage
   PRIORITY: {
-    HIGH: ['greeting', 'first_question', 'outro'], // Always try ElevenLabs
-    MEDIUM: ['key_questions'], // Try ElevenLabs if within limits
-    LOW: ['confirmation', 'decline', 'final'] // Use Twilio TTS
+    HIGH: [], // Disabled
+    MEDIUM: [],
+    LOW: ['greeting', 'confirmation', 'decline', 'final', 'first_question', 'outro', 'key_questions'] // All use Twilio TTS
   },
   
   // Voice settings

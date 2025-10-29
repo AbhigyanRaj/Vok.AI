@@ -17,7 +17,7 @@ export const transcribeAudio = async (audioBuffer) => {
 
 export const generateSummary = async (text) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `You are a helpful assistant that summarizes call transcripts and extracts key insights. Please summarize this call transcript and extract key insights: ${text}`;
     
     const result = await model.generateContent(prompt);
@@ -53,7 +53,7 @@ You are a loan decisioning expert. Respond only with YES, NO, or INVESTIGATION_R
 `;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text().trim();
@@ -87,7 +87,7 @@ You are a credit card decisioning expert. Respond only with YES, NO, or INVESTIG
 `;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text().trim();
@@ -151,7 +151,7 @@ export const evaluateApplication = async (applicationType, applicationData) => {
  */
 export const analyzeResponseWithGemini = async (prompt) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text().trim();
