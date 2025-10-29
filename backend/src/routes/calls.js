@@ -120,8 +120,25 @@ function hasPublicUrl() {
 }
 
 // Simple Twilio TTS function (replaces ElevenLabs)
-async function generateSmartAudio(text, audioType, callId, twimlResponse, selectedVoice = 'RACHEL', moduleId = null) {
+async function generateSmartAudio(text, audioType, callId, twimlResponse, selectedVoice = 'RACHEL', moduleId = null, dbCallId = null) {
   console.log(`🎤 [${audioType.toUpperCase()}] AI SAYS: "${text}"`);
+  
+  // Broadcast AI speech to WebSocket clients using database call ID if available
+  const broadcastId = dbCallId || callId;
+  if (broadcastId) {
+    try {
+      broadcastTranscriptUpdate(broadcastId, {
+        speaker: 'AI',
+        text: text,
+        type: audioType,
+        questionIndex: audioType === 'question' ? -1 : undefined,
+        question: audioType === 'question' ? text : audioType
+      });
+    } catch (error) {
+      console.error('WebSocket broadcast error (non-critical):', error);
+    }
+  }
+  
   twimlResponse.say(text, { 
     voice: HYBRID_CONFIG.TWILIO_VOICE,
     language: HYBRID_CONFIG.TWILIO_LANGUAGE
@@ -620,7 +637,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         callId,
         twimlResponse,
         selectedVoice,
-        moduleId
+        moduleId,
+        call ? call._id.toString() : null
       );
 
       const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
@@ -670,7 +688,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
             callId,
             twimlResponse,
             selectedVoice,
-            moduleId
+            moduleId,
+            call ? call._id.toString() : null
           );
           
           twimlResponse.pause({ length: 0.5 });
@@ -938,7 +957,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           callId,
           twimlResponse,
           selectedVoice,
-          moduleId
+          moduleId,
+          call ? call._id.toString() : null
         );
         
         twimlResponse.pause({ length: 0.2 });
@@ -950,7 +970,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           callId,
           twimlResponse,
           selectedVoice,
-          moduleId
+          moduleId,
+          call ? call._id.toString() : null
         );
         
         twimlResponse.hangup();
@@ -1002,7 +1023,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           callId,
           gather,
           selectedVoice,
-          moduleId
+          moduleId,
+          call ? call._id.toString() : null
         );
         
         console.log(`❓ Asked question ${nextQuestionIndex + 1}: ${questions[nextQuestionIndex].question}`);

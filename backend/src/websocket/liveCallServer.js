@@ -19,7 +19,7 @@ export function initializeLiveCallWebSocket(server) {
     const callId = url.searchParams.get('callId');
     
     if (!callId) {
-      console.log('❌ WebSocket connection rejected: No callId provided');
+      console.log('WebSocket connection rejected: No callId provided');
       ws.close(1008, 'Call ID required');
       return;
     }

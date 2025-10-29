@@ -77,7 +77,7 @@ const LiveCallModal: React.FC<LiveCallModalProps> = ({
       setError('');
       
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('vokai_jwt_token');
         if (!token) {
           setError('Authentication required');
           return;
@@ -95,25 +95,35 @@ const LiveCallModal: React.FC<LiveCallModalProps> = ({
         
         if (data.success && data.call) {
           setCallDetails(data.call);
-          const isCompleted = data.call.status === 'completed';
-          setCallStatus(isCompleted ? 'completed' : 'active');
-          setCallDuration(data.call.duration || 0);
+          const callStatus = data.call.status;
           
-          // Parse stored transcript if available
-          if (data.call.transcription) {
-            const parsedTranscript = parseStoredTranscript(data.call.transcription);
-            setTranscript(parsedTranscript);
-            setCurrentQuestion(isCompleted ? 'Call completed' : 'Loading live transcript...');
-          } else if (isCompleted) {
-            // Completed call with no transcript
-            setError('Transcript not available for this call');
+          // Set appropriate status and messages based on call state
+          if (callStatus === 'completed') {
+            setCallStatus('completed');
+            setCallDuration(data.call.duration || 0);
+            
+            if (data.call.transcription) {
+              const parsedTranscript = parseStoredTranscript(data.call.transcription);
+              setTranscript(parsedTranscript);
+              setCurrentQuestion('Call completed');
+            } else {
+              setError('Transcript not available for this call');
+            }
+          } else if (callStatus === 'failed' || callStatus === 'busy' || callStatus === 'no-answer' || callStatus === 'canceled') {
+            setCallStatus('failed');
+            setError(`Call ${callStatus.replace('-', ' ')} - No transcript available`);
           } else {
-            // Live call - will get transcript via WebSocket
-            setCurrentQuestion('Waiting for call to start...');
-          }
-
-          // Setup WebSocket connection for live calls
-          if (!isCompleted) {
+            // Active, ringing, initiated, or answered calls
+            setCallStatus('connecting');
+            setCurrentQuestion(
+              callStatus === 'initiated' || callStatus === 'ringing' 
+                ? 'Call connecting...' 
+                : callStatus === 'answered'
+                ? 'Call in progress - waiting for transcript...'
+                : 'Connecting to live transcript...'
+            );
+            
+            // Setup WebSocket connection for live calls
             setupWebSocketConnection();
           }
         } else {
@@ -140,6 +150,8 @@ const LiveCallModal: React.FC<LiveCallModalProps> = ({
         ws.onopen = () => {
           console.log('✅ WebSocket connected for call:', callId);
           setConnectionStatus('connected');
+          setCallStatus('active');
+          setCurrentQuestion('Connected - waiting for transcript...');
         };
 
         ws.onmessage = (event) => {
