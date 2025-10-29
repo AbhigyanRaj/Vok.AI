@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: vokai-backend
+    env: node
+    plan: starter
+    buildCommand: cd backend && npm ci --only=production
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    autoDeploy: true
+    branch: main
+    rootDir: .
+    
+databases:
+  - name: vokai-mongodb
+    databaseName: vokai
+    user: vokai

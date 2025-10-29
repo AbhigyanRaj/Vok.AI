@@ -34,7 +34,7 @@ import http from 'http';
 
 const app = express();
 const httpServer = http.createServer(app);
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
 // Debug: Check if environment variables are loaded
 

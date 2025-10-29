@@ -7,10 +7,15 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "build": "echo 'Build completed'",
     "test": "jest",
     "setup-db": "node scripts/setup-db.js",
     "test-connection": "node scripts/test-connection.js",
     "fix-database": "node scripts/fix-database.js"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   },
   "dependencies": {
     "@deepgram/sdk": "^4.11.2",
