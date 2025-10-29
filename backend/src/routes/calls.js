@@ -651,9 +651,9 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           console.log('\n✅ CUSTOMER CONFIRMED AVAILABILITY!');
           console.log('🎯 Moving to questions...');
           
-          // Use smart hybrid for confirmation
+          // Use smart hybrid for confirmation and first question together
           await generateSmartAudio(
-            'Perfect! Thank you for your time. I will now ask you a few quick questions. Please speak clearly after each question, and I will wait for your response.',
+            `Perfect! Thank you for your time. I will now ask you a few quick questions. Please speak clearly after each question. Here's the first question: ${questions[0].question}`,
             'confirmation',
             callId,
             twimlResponse,
@@ -661,7 +661,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
             moduleId
           );
           
-          twimlResponse.pause({ length: 0.1 });
+          twimlResponse.pause({ length: 0.5 });
 
           const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
           nextUrl.searchParams.set('moduleId', moduleId);
@@ -671,7 +671,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           nextUrl.searchParams.set('selectedVoice', selectedVoice);
           nextUrl.searchParams.set('callId', callId);
 
-          const gather = twimlResponse.gather({
+          twimlResponse.gather({
             input: 'speech',
             action: nextUrl.toString(),
             timeout: 5,
@@ -682,16 +682,6 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
             language: 'en-US',
             hints: 'yes,no,okay,sure,interested,not interested,maybe,definitely,absolutely,never,sounds good,great,fine,alright'
           });
-          
-          // Use smart hybrid for the first question (HIGH PRIORITY)
-          await generateSmartAudio(
-            questions[0].question,
-            'question',
-            callId,
-            gather,
-            selectedVoice,
-            moduleId
-          );
 
         } else {
           console.log('\n❌ CUSTOMER DECLINED');
@@ -826,7 +816,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         console.log(`Storing response for question ${questionIndex}: ${previousResponse}`);
         
         // Analyze the response using AI to determine Yes/No/Maybe
-        const analysisResult = await analyzeCustomerResponse(previousResponse, questions[questionIndex - 1]?.question || '');
+        const currentQuestion = questions[questionIndex]?.question || '';
+        const analysisResult = await analyzeCustomerResponse(previousResponse, currentQuestion);
         console.log(`🤖 AI Analysis Result: ${analysisResult}`);
         
         // Update call record with response and analysis
