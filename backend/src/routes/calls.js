@@ -1164,16 +1164,21 @@ async function processCallCompletion(call, phoneNumber) {
       comments.push('Application meets all eligibility criteria');
     } else if (evaluation === 'NO') {
       comments.push('Application does not meet minimum eligibility requirements');
+    } else if (evaluation === 'DECLINED') {
+      comments.push('Customer declined to proceed with the call');
+      comments.push('Call ended at availability check');
     } else if (evaluation === 'MAYBE') {
       comments.push('Customer showed interest but needs more information');
     } else {
       comments.push('Further verification and documentation required');
     }
 
-    if (call.duration < 30) {
-      comments.push('Call duration was too short - incomplete information');
-    } else if (call.duration < 60) {
-      comments.push('Partial information collected');
+    if (evaluation !== 'DECLINED') {
+      if (call.duration < 30) {
+        comments.push('Call duration was too short - incomplete information');
+      } else if (call.duration < 60) {
+        comments.push('Partial information collected');
+      }
     }
 
     // Update call record with evaluation

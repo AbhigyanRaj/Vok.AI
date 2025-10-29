@@ -137,12 +137,29 @@ export const generateCreditCardQuestions = () => {
  * Evaluate application based on type
  */
 export const evaluateApplication = async (applicationType, applicationData) => {
+  // Handle declined calls or custom modules
+  if (!applicationType || applicationType === 'custom') {
+    // For custom modules, check if there are actual question responses
+    const hasQuestionResponses = Object.keys(applicationData).some(key => {
+      const numKey = parseInt(key);
+      return !isNaN(numKey) && numKey > 0;
+    });
+    
+    if (!hasQuestionResponses) {
+      // Call was declined or no questions answered
+      return 'DECLINED';
+    }
+    
+    // For custom modules with responses, return INVESTIGATION_REQUIRED
+    return 'INVESTIGATION_REQUIRED';
+  }
+  
   if (applicationType === 'loan') {
     return await evaluateLoanApplication(applicationData);
   } else if (applicationType === 'credit_card') {
     return await evaluateCreditCardApplication(applicationData);
   } else {
-    throw new Error('Invalid application type');
+    return 'INVESTIGATION_REQUIRED';
   }
 };
 
