@@ -13,11 +13,13 @@ import {
   AlertTriangle,
   X,
   Activity,
-  PhoneOutgoing
+  PhoneOutgoing,
+  Eye
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import * as auth from "../lib/auth";
 import { api } from "../lib/api";
+import LiveCallModal from "./LiveCallModal";
 
 interface CallData {
   _id: string;
@@ -93,6 +95,8 @@ const AnalyticsPage: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
   const [selectedModuleFilter, setSelectedModuleFilter] = useState<string>('all');
   const [retryingCall, setRetryingCall] = useState<string | null>(null);
+  const [liveCallId, setLiveCallId] = useState<string | null>(null);
+  const [liveCallData, setLiveCallData] = useState<{ customerName: string; phoneNumber: string } | null>(null);
 
   const fetchAnalyticsData = async () => {
     if (!user) return;
@@ -597,7 +601,7 @@ const AnalyticsPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-zinc-400 text-xs sm:text-sm">Avg Duration</p>
-                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{formatDuration(analyticsData?.averageDuration || 0)}</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{formatDuration(Math.round(analyticsData?.averageDuration || 0))}</p>
                 <p className="text-xs text-zinc-500 mt-1">per call</p>
               </div>
               <div className="bg-yellow-500/20 p-2 sm:p-3 rounded-full">
@@ -965,6 +969,24 @@ const AnalyticsPage: React.FC = () => {
                           </td>
                           <td className="py-4 px-4">
                             <div className="flex items-center gap-2">
+                              {(call.status === 'in-progress' || call.status === 'answered' || call.status === 'ringing') && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setLiveCallId(call._id);
+                                    setLiveCallData({
+                                      customerName: call.customerName,
+                                      phoneNumber: call.phoneNumber
+                                    });
+                                  }}
+                                  className="text-xs sm:text-sm px-3 py-2 text-green-400 border-green-500/30 hover:bg-green-500/10 animate-pulse"
+                                  title="View live call transcript"
+                                >
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  Live
+                                </Button>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1051,8 +1073,21 @@ const AnalyticsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Live Call Modal */}
+      {liveCallId && liveCallData && (
+        <LiveCallModal
+          callId={liveCallId}
+          customerName={liveCallData.customerName}
+          phoneNumber={liveCallData.phoneNumber}
+          onClose={() => {
+            setLiveCallId(null);
+            setLiveCallData(null);
+          }}
+        />
+      )}
     </div>
   );
 };
 
-export default AnalyticsPage; 
+export default AnalyticsPage;

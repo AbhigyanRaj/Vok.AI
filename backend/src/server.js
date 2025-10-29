@@ -28,6 +28,7 @@ import moduleRoutes from './routes/modules.js';
 import callRoutes from './routes/calls.js';
 import userRoutes from './routes/users.js';
 import { setupMediaStreamWebSocket } from './routes/mediaStream.js';
+import { initializeLiveCallWebSocket } from './websocket/liveCallServer.js';
 import http from 'http';
 
 
@@ -128,12 +129,16 @@ const startServer = async () => {
     // Initialize WebSocket server for Media Streams
     setupMediaStreamWebSocket(httpServer);
     
+    // Initialize WebSocket server for Live Call Monitoring
+    initializeLiveCallWebSocket(httpServer);
+    
     // Start the server
     httpServer.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
       console.log(`📊 Database Status: ${getDBStatus()}`);
       console.log(`🎤 WebSocket server ready for Twilio Media Streams`);
+      console.log(`📡 Live Call Monitor WebSocket ready`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

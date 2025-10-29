@@ -3,6 +3,7 @@ import { validateTwilioRequest } from '../config/twilio.js';
 import { createTwiMLResponse, addMediaStream } from '../utils/twimlHelpers.js';
 import { analyzeResponseWithGemini, evaluateApplication, generateSummary } from '../config/openai.js';
 import { formatPhoneNumber, validatePhoneNumber } from '../utils/phoneUtils.js';
+import { broadcastTranscript, broadcastCallStatus, broadcastCallEnd } from '../websocket/liveCallServer.js';
 import twilio from 'twilio';
 import User from '../models/User.js';
 import Module from '../models/Module.js';
@@ -602,14 +603,22 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       }
       
       // Use smart hybrid for greeting (HIGH PRIORITY)
+      const greetingText = `Hello ${customerName}, this is an automated call from Vok AI. We have a few important questions that will only take 2-3 minutes of your time. Is now a good time to speak with you?`;
       await generateSmartAudio(
-        `Hello ${customerName}, this is an automated call from Vok AI. We have a few important questions that will only take 2-3 minutes of your time. Is now a good time to speak with you?`,
+        greetingText,
         'greeting',
         callId,
         twimlResponse,
         selectedVoice,
         moduleId
       );
+      
+      // Broadcast greeting to live viewers
+      broadcastTranscript(callId, {
+        speaker: 'AI',
+        text: greetingText,
+        type: 'ai_speech'
+      });
 
       const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
       nextUrl.searchParams.set('moduleId', moduleId);
@@ -638,6 +647,14 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       const callId = req.query.callId || req.body.callId || `webhook_${Date.now()}`;
       
       if (previousResponse && previousResponse.trim().length > 0) {
+        // Broadcast user's availability response
+        broadcastTranscript(callId, {
+          speaker: 'User',
+          text: previousResponse,
+          type: 'user_speech',
+          confidence: speechResult?.Confidence || 'N/A'
+        });
+        
         // Customer responded - check if positive (more flexible matching)
         const positiveWords = ['yes', 'okay', 'sure', 'go ahead', 'yeah', 'yep', 'yup', 'hmm', 'uh huh', 'alright', 'fine', 'good', 'great', 'sounds good', 'perfect'];
         const negativeWords = ['no', 'not now', 'busy', 'later', 'bad time', 'cannot', 'can\'t'];
@@ -652,14 +669,23 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           console.log('🎯 Moving to questions...');
           
           // Use smart hybrid for confirmation and first question together
+          const confirmationText = `Perfect! Thank you for your time. I will now ask you a few quick questions. Please speak clearly after each question. Here's the first question: ${questions[0].question}`;
           await generateSmartAudio(
-            `Perfect! Thank you for your time. I will now ask you a few quick questions. Please speak clearly after each question. Here's the first question: ${questions[0].question}`,
+            confirmationText,
             'confirmation',
             callId,
             twimlResponse,
             selectedVoice,
             moduleId
           );
+          
+          // Broadcast AI's confirmation and first question
+          broadcastTranscript(callId, {
+            speaker: 'AI',
+            text: confirmationText,
+            type: 'ai_speech',
+            questionNumber: 0
+          });
           
           twimlResponse.pause({ length: 0.5 });
 
@@ -822,6 +848,16 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         
         // Analyze the response using AI to determine Yes/No/Maybe
         const currentQuestion = questions[questionIndex]?.question || '';
+        
+        // Broadcast user's response
+        broadcastTranscript(callId, {
+          speaker: 'User',
+          text: previousResponse,
+          type: 'user_speech',
+          confidence: speechResult?.Confidence || 'N/A',
+          questionNumber: questionIndex
+        });
+        
         const analysisResult = await analyzeCustomerResponse(previousResponse, currentQuestion);
         console.log(`   🤖 AI Analysis: ${analysisResult}`);
         
@@ -902,17 +938,35 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           moduleId
         );
         
+        // Broadcast thank you message
+        broadcastTranscript(callId, {
+          speaker: 'AI',
+          text: thankYouMessage,
+          type: 'ai_speech'
+        });
+        
         twimlResponse.pause({ length: 0.2 });
         
         // Use smart hybrid for final message
+        const finalMessage = 'Our team will carefully review your responses. Thank you for choosing Vok AI, and have a wonderful day!';
         await generateSmartAudio(
-          'Our team will carefully review your responses. Thank you for choosing Vok AI, and have a wonderful day!',
+          finalMessage,
           'final',
           callId,
           twimlResponse,
           selectedVoice,
           moduleId
         );
+        
+        // Broadcast final message
+        broadcastTranscript(callId, {
+          speaker: 'AI',
+          text: finalMessage,
+          type: 'ai_speech'
+        });
+        
+        // Notify viewers that call is ending
+        broadcastCallEnd(callId);
         
         twimlResponse.hangup();
 
@@ -957,8 +1011,9 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         });
         
         // Ask the NEXT question (not the current one we just answered)
+        const nextQuestion = questions[nextQuestionIndex].question;
         await generateSmartAudio(
-          questions[nextQuestionIndex].question,
+          nextQuestion,
           'question',
           callId,
           gather,
@@ -966,7 +1021,15 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           moduleId
         );
         
-        console.log(`❓ Asked question ${nextQuestionIndex + 1}: ${questions[nextQuestionIndex].question}`);
+        // Broadcast next question to live viewers
+        broadcastTranscript(callId, {
+          speaker: 'AI',
+          text: nextQuestion,
+          type: 'ai_speech',
+          questionNumber: nextQuestionIndex
+        });
+        
+        console.log(`❓ Asked question ${nextQuestionIndex + 1}: ${nextQuestion}`);
       }
     }
 
