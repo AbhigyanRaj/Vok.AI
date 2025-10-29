@@ -55,11 +55,6 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [calling, setCalling] = useState(false);
-  const [tokenInfo, setTokenInfo] = useState<{
-    costPerCall: number;
-    currentBalance: number;
-    canMakeCall: boolean;
-  } | null>(null);
   const [selectedVoice, setSelectedVoice] = useState('RACHEL');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -124,30 +119,7 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
     };
   }, []);
 
-  // Fetch token information on component mount
-  React.useEffect(() => {
-    const fetchTokenInfo = async () => {
-      try {
-        const token = auth.getStoredToken();
-        
-        if (token) {
-          const response = await api.getCallCostInfo(token);
-          
-          if (response.success) {
-            setTokenInfo(response);
-          } else {
-            console.error('Failed to get call cost info:', response.error);
-          }
-        } else {
-          console.log('No token found, skipping token info fetch');
-        }
-      } catch (error) {
-        console.error('Error fetching token info:', error);
-      }
-    };
-
-    fetchTokenInfo();
-  }, []);
+  // Token system removed - unlimited calls
 
   // Close dropdown on outside click or ESC
   useEffect(() => {
@@ -312,22 +284,9 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
       );
 
       if (result.success) {
-        // Update token info after successful call
-        if (result.remainingTokens !== undefined) {
-          setTokenInfo(prev => prev ? {
-            ...prev,
-            currentBalance: result.remainingTokens
-          } : null);
-        }
         return true;
       } else {
         console.error('Call initiation failed:', result.error);
-        
-        // Handle insufficient tokens error
-        if (result.error === 'Insufficient tokens') {
-          setError(`Insufficient tokens: ${result.message}`);
-          return false;
-        }
         
         // Handle trial account limitation
         if (result.error === 'Trial account limitation' || result.code === 'UNVERIFIED_NUMBER') {
@@ -349,12 +308,6 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
       }
     } catch (error: any) {
       console.error('Error making call:', error);
-      
-      // Handle insufficient tokens error from API
-      if (error.message?.includes('Insufficient tokens') || error.status === 402) {
-        setError('Insufficient tokens to make this call. Please buy more tokens.');
-        return false;
-      }
       
       // Handle network errors
       if (error.message?.includes('fetch') || error.message?.includes('network')) {

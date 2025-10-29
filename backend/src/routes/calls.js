@@ -230,15 +230,7 @@ router.post('/initiate', protect, async (req, res) => {
       return res.status(403).json({ error: 'Access denied to this module' });
     }
 
-    // Check if user has enough tokens for a call (5 tokens per call)
-    if (!user.hasEnoughTokensForCall()) {
-      return res.status(402).json({
-        error: 'Insufficient tokens',
-        message: `You need ${user.getCostPerCall()} tokens to make a call. Current balance: ${user.tokens} tokens.`,
-        currentBalance: user.tokens,
-        requiredTokens: user.getCostPerCall()
-      });
-    }
+    // Token system removed - unlimited calls
 
     // Format and validate phone number
     const formattedPhone = formatPhoneNumber(phoneNumber);
@@ -268,7 +260,6 @@ router.post('/initiate', protect, async (req, res) => {
     console.log('Module Name:', module.name);
     console.log('Customer:', customerName);
     console.log('Phone:', formattedPhone);
-    console.log('Tokens before call:', user.tokens);
 
     // Check if we have Twilio credentials
     if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
@@ -456,23 +447,11 @@ router.post('/initiate', protect, async (req, res) => {
     console.log('Call SID:', call.sid);
     console.log('Call Status:', call.status);
 
-    // Deduct tokens for the call
-    const tokensDeducted = user.deductTokens();
-    if (!tokensDeducted) {
-      return res.status(402).json({
-        error: 'Failed to deduct tokens',
-        message: 'Unable to deduct tokens for the call'
-      });
-    }
-
     // Increment total calls made
     user.totalCallsMade += 1;
-
-    // Save user changes
     await user.save();
 
-    console.log('✅ Tokens deducted successfully');
-    console.log('Tokens after call:', user.tokens);
+    console.log('✅ Call initiated successfully');
     console.log('Total calls made:', user.totalCallsMade);
 
     // Create call record in database
@@ -484,7 +463,6 @@ router.post('/initiate', protect, async (req, res) => {
       twilioCallSid: call.sid,
       status: call.status || 'initiated', // Use actual call status
       currentStep: 0,
-      tokensUsed: user.getCostPerCall(),
       duration: 0, // Will be updated when call completes
     });
 
@@ -518,8 +496,6 @@ router.post('/initiate', protect, async (req, res) => {
         name: module.name,
         questions: module.questions
       },
-      tokensUsed: user.getCostPerCall(),
-      remainingTokens: user.tokens,
       note: 'You should receive a call within 30 seconds'
     });
 
@@ -553,26 +529,35 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
     console.log('Request Query:', req.query);
     
     // Enhanced user input logging with question context
-    if (previousResponse) {
+    if (previousResponse && previousResponse.trim().length > 0) {
       console.log('\n' + '='.repeat(80));
-      console.log('💬 LIVE CONVERSATION');
+      console.log('💬 LIVE CONVERSATION - Step ' + step);
       console.log('='.repeat(80));
       
-      // Show what question was asked
-      if (step > 0) {
+      // Show what question was asked based on step
+      if (step === 1) {
+        console.log(`❓ AI ASKED: "Is now a good time to speak with you?"`);
+      } else if (step > 1) {
         const module = await Module.findById(moduleId);
-        if (module && module.questions && module.questions[step - 1]) {
-          const previousQuestion = module.questions.find(q => q.order === step - 1);
-          if (previousQuestion) {
-            console.log(`❓ QUESTION ${step}: "${previousQuestion.question}"`);
+        if (module && module.questions) {
+          const questionIndex = step - 2;
+          const question = module.questions.find(q => q.order === questionIndex);
+          if (question) {
+            console.log(`❓ AI ASKED (Q${questionIndex + 1}): "${question.question}"`);
           }
         }
       }
       
-      console.log(`💬 USER RESPONSE: "${previousResponse}"`);
+      console.log(`💬 USER SAID: "${previousResponse}"`);
       console.log('📊 Confidence:', req.body.Confidence || 'N/A');
-      console.log('🔍 Analysis:', previousResponse.toLowerCase().includes('yes') ? '✅ POSITIVE' : previousResponse.toLowerCase().includes('no') ? '❌ NEGATIVE' : '⚠️ NEUTRAL');
+      
+      const lowerResponse = previousResponse.toLowerCase();
+      const analysis = lowerResponse.includes('yes') || lowerResponse.includes('yeah') || lowerResponse.includes('sure') ? '✅ POSITIVE' : 
+                       lowerResponse.includes('no') || lowerResponse.includes('not') ? '❌ NEGATIVE' : '⚠️ NEUTRAL';
+      console.log('🔍 Quick Analysis:', analysis);
       console.log('='.repeat(80) + '\n');
+    } else if (step > 0) {
+      console.log('\n⚠️ NO USER RESPONSE DETECTED (Timeout or silence)');
     }
 
     // Get module and its questions
@@ -687,9 +672,9 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           const gather = twimlResponse.gather({
             input: 'speech',
             action: nextUrl.toString(),
-            timeout: 3,
+            timeout: 5,
             method: 'POST',
-            speechTimeout: 1.5,
+            speechTimeout: 'auto',
             speechModel: 'experimental_conversations',
             enhanced: true,
             language: 'en-US',
@@ -778,8 +763,64 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       const questionIndex = step - 2;
       const callId = req.query.callId || req.body.callId || `webhook_${Date.now()}`;
       
+      // Check if user didn't respond (timeout)
+      const retryCount = parseInt(req.query.retryCount || '0');
+      
+      if (!previousResponse || previousResponse.trim().length === 0) {
+        console.log(`⚠️ No response received for question ${questionIndex} (Retry: ${retryCount})`);
+        
+        // If this is the first timeout, ask user to respond
+        if (retryCount < 2) {
+          console.log('🔄 Prompting user to answer...');
+          
+          const retryUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
+          retryUrl.searchParams.set('moduleId', moduleId);
+          retryUrl.searchParams.set('customerName', customerName);
+          retryUrl.searchParams.set('step', step.toString());
+          retryUrl.searchParams.set('phoneNumber', phoneNumber);
+          retryUrl.searchParams.set('selectedVoice', selectedVoice);
+          retryUrl.searchParams.set('callId', callId);
+          retryUrl.searchParams.set('retryCount', (retryCount + 1).toString());
+          
+          const gather = twimlResponse.gather({
+            input: 'speech',
+            action: retryUrl.toString(),
+            timeout: 5,
+            method: 'POST',
+            speechTimeout: 'auto',
+            speechModel: 'experimental_conversations',
+            enhanced: true,
+            language: 'en-US',
+            hints: 'yes,no,okay,sure,interested,not interested,maybe,definitely,absolutely,never,sounds good,great,fine,alright'
+          });
+          
+          // Prompt user to answer
+          await generateSmartAudio(
+            "I didn't catch that. Could you please answer the question? Please speak clearly.",
+            'retry_prompt',
+            callId,
+            gather,
+            selectedVoice,
+            moduleId
+          );
+          
+          return res.type('text/xml').send(twimlResponse.toString());
+        } else {
+          // After 2 retries, skip this question and move to next
+          console.log('⏭️ Skipping question after 2 retries...');
+          
+          if (call) {
+            call.responses.set(questionIndex.toString(), '[No response]');
+            await call.save();
+          }
+          
+          // Move to next question by incrementing step
+          step = step + 1;
+        }
+      }
+      
       // Store previous response if available
-      if (previousResponse && phoneNumber && call) {
+      if (previousResponse && previousResponse.trim().length > 0 && phoneNumber && call) {
         console.log(`Storing response for question ${questionIndex}: ${previousResponse}`);
         
         // Analyze the response using AI to determine Yes/No/Maybe
@@ -901,9 +942,9 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         const gather = twimlResponse.gather({
           input: 'speech',
           action: nextUrl.toString(),
-          timeout: 3,
+          timeout: 5,
           method: 'POST',
-          speechTimeout: 1.5,
+          speechTimeout: 'auto',
           speechModel: 'experimental_conversations',
           enhanced: true,
           language: 'en-US',
@@ -1334,9 +1375,6 @@ router.get('/cost-info', protect, async (req, res) => {
 
     res.json({
       success: true,
-      costPerCall: user.getCostPerCall(),
-      currentBalance: user.tokens,
-      canMakeCall: user.hasEnoughTokensForCall(),
       totalCallsMade: user.totalCallsMade
     });
   } catch (error) {

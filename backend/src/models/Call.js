@@ -64,10 +64,6 @@ const callSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  tokensUsed: {
-    type: Number,
-    default: 1,
-  },
 }, {
   timestamps: true,
 });
