@@ -750,10 +750,13 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         }
       }
 
-    } else if (step < questions.length + 2) {
-      // Handle question responses
+    } else if (step >= 2) {
+      // Handle question responses (step 2 onwards)
+      // Step 2 = answer to question 0, Step 3 = answer to question 1, etc.
       const questionIndex = step - 2;
       const callId = req.query.callId || req.body.callId || `webhook_${Date.now()}`;
+      
+      console.log(`\n📍 Processing Step ${step}: Question Index ${questionIndex} (Total questions: ${questions.length})`);
       
       // Check if user didn't respond (timeout)
       const retryCount = parseInt(req.query.retryCount || '0');
@@ -813,15 +816,18 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       
       // Store previous response if available
       if (previousResponse && previousResponse.trim().length > 0 && phoneNumber && call) {
-        console.log(`Storing response for question ${questionIndex}: ${previousResponse}`);
+        console.log(`\n💾 Storing response for Question ${questionIndex + 1}:`);
+        console.log(`   Question: "${questions[questionIndex]?.question}"`);
+        console.log(`   Answer: "${previousResponse}"`);
         
         // Analyze the response using AI to determine Yes/No/Maybe
         const currentQuestion = questions[questionIndex]?.question || '';
         const analysisResult = await analyzeCustomerResponse(previousResponse, currentQuestion);
-        console.log(`🤖 AI Analysis Result: ${analysisResult}`);
+        console.log(`   🤖 AI Analysis: ${analysisResult}`);
         
         // Update call record with response and analysis
         call.responses.set(questionIndex.toString(), previousResponse);
+        console.log(`   ✅ Saved as response[${questionIndex}]`);
         call.currentStep = step;
         call.status = 'in-progress';
         
@@ -863,10 +869,14 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         console.log('✅ Conversation updated:', conversation);
       }
 
-      // Check if we've reached the end of questions
-      if (questionIndex >= questions.length) {
-        // End of questions - play outro
-        console.log('End of questions reached, playing outro...');
+      // Check if we've answered all questions
+      // questionIndex represents the question we just answered
+      // If questionIndex + 1 >= questions.length, we've answered all questions
+      const nextQuestionIndex = questionIndex + 1;
+      
+      if (nextQuestionIndex >= questions.length) {
+        // All questions answered - play outro
+        console.log(`\n✅ All ${questions.length} questions answered! Playing outro...`);
         
         // Analyze all responses to provide personalized thank you
         const allResponses = Array.from(call.responses.values());
@@ -923,7 +933,9 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         }
 
       } else {
-        // Ask next question with optimized flow
+        // More questions remaining - ask the next one
+        console.log(`\n➡️ Moving to next question: Question ${nextQuestionIndex + 1} of ${questions.length}`);
+        
         const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
         nextUrl.searchParams.set('moduleId', moduleId);
         nextUrl.searchParams.set('customerName', customerName);
@@ -944,9 +956,9 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           hints: 'yes,no,okay,sure,interested,not interested,maybe,definitely,absolutely,never,sounds good,great,fine,alright'
         });
         
-        // Use smart hybrid for the question
+        // Ask the NEXT question (not the current one we just answered)
         await generateSmartAudio(
-          questions[questionIndex].question,
+          questions[nextQuestionIndex].question,
           'question',
           callId,
           gather,
@@ -954,7 +966,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           moduleId
         );
         
-        console.log(`Asked question ${questionIndex}: ${questions[questionIndex].question}`);
+        console.log(`❓ Asked question ${nextQuestionIndex + 1}: ${questions[nextQuestionIndex].question}`);
       }
     }
 
