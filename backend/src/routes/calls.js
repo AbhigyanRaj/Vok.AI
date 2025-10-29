@@ -537,13 +537,15 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       // Show what question was asked based on step
       if (step === 1) {
         console.log(`❓ AI ASKED: "Is now a good time to speak with you?"`);
-      } else if (step > 1) {
+      } else if (step >= 2) {
         const module = await Module.findById(moduleId);
         if (module && module.questions) {
           const questionIndex = step - 2;
           const question = module.questions.find(q => q.order === questionIndex);
           if (question) {
             console.log(`❓ AI ASKED (Q${questionIndex + 1}): "${question.question}"`);
+          } else {
+            console.log(`❓ AI ASKED: [Question ${questionIndex + 1} - ended call]`);
           }
         }
       }
