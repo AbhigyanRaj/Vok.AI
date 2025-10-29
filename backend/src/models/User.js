@@ -32,9 +32,26 @@ const userSchema = new mongoose.Schema({
     default: 0,
   },
   subscription: {
-    type: String,
-    enum: ['free', 'basic', 'premium'],
-    default: 'free',
+    tier: {
+      type: String,
+      enum: ['free', 'pro', 'enterprise'],
+      default: 'free',
+    },
+    status: {
+      type: String,
+      enum: ['active', 'canceled', 'expired'],
+      default: 'active',
+    },
+    startDate: Date,
+    endDate: Date,
+  },
+  dailyUsage: {
+    date: String,
+    callsMade: {
+      type: Number,
+      default: 0,
+    },
+    lastResetAt: Date,
   },
 }, {
   timestamps: true,

@@ -38,6 +38,14 @@ const moduleSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+  },
+  deletedAt: {
+    type: Date,
+    default: null,
+  },
   totalCalls: {
     type: Number,
     default: 0,

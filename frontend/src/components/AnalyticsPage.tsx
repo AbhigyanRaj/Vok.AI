@@ -37,10 +37,12 @@ interface CallData {
   responses?: Map<string, string>;
   transcription?: string;
   evaluation?: {
-    result: 'YES' | 'NO' | 'INVESTIGATION_REQUIRED';
+    result: 'YES' | 'NO' | 'MAYBE';
     comments: string[];
   };
   summary?: string;
+  callType?: 'individual' | 'bulk';
+  batchId?: string;
 }
 
 interface AnalyticsData {
@@ -55,6 +57,30 @@ interface AnalyticsData {
   recentCalls: CallData[];
   statusDistribution: Array<{ status: string; count: number; percentage: number }>;
   dailyCalls: Array<{ date: string; count: number }>;
+  resultDistribution: {
+    yes: number;
+    no: number;
+    maybe: number;
+    total: number;
+  };
+  bulkCallStats: Array<{
+    batchId: string;
+    moduleName: string;
+    totalCalls: number;
+    yesCount: number;
+    noCount: number;
+    maybeCount: number;
+    conversionRate: number;
+    date: string;
+  }>;
+  moduleWiseResults?: {
+    [moduleName: string]: {
+      yes: number;
+      no: number;
+      maybe: number;
+      total: number;
+    };
+  };
 }
 
 const AnalyticsPage: React.FC = () => {
@@ -67,6 +93,7 @@ const AnalyticsPage: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingCall, setDeletingCall] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [selectedModuleFilter, setSelectedModuleFilter] = useState<string>('all');
 
   const fetchAnalyticsData = async () => {
     if (!user) return;
@@ -170,6 +197,80 @@ const AnalyticsPage: React.FC = () => {
         .sort((a: CallData, b: CallData) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 10);
 
+      // Calculate result distribution (Yes/No/Maybe)
+      const completedCallsWithResults = filteredCalls.filter((call: CallData) => 
+        call.status === 'completed' && call.evaluation?.result
+      );
+      
+      const yesCount = completedCallsWithResults.filter((call: CallData) => 
+        call.evaluation?.result === 'YES'
+      ).length;
+      
+      const noCount = completedCallsWithResults.filter((call: CallData) => 
+        call.evaluation?.result === 'NO'
+      ).length;
+      
+      const maybeCount = completedCallsWithResults.filter((call: CallData) => 
+        call.evaluation?.result === 'MAYBE'
+      ).length;
+      
+      const resultDistribution = {
+        yes: yesCount,
+        no: noCount,
+        maybe: maybeCount,
+        total: completedCallsWithResults.length
+      };
+      
+      // Calculate module-wise result distribution
+      const moduleWiseResults: { [key: string]: { yes: number; no: number; maybe: number; total: number } } = {};
+      
+      completedCallsWithResults.forEach((call: CallData) => {
+        const moduleName = call.moduleName || 'Unknown';
+        if (!moduleWiseResults[moduleName]) {
+          moduleWiseResults[moduleName] = { yes: 0, no: 0, maybe: 0, total: 0 };
+        }
+        moduleWiseResults[moduleName].total++;
+        
+        if (call.evaluation?.result === 'YES') {
+          moduleWiseResults[moduleName].yes++;
+        } else if (call.evaluation?.result === 'NO') {
+          moduleWiseResults[moduleName].no++;
+        } else if (call.evaluation?.result === 'MAYBE') {
+          moduleWiseResults[moduleName].maybe++;
+        }
+      });
+      
+      // Calculate bulk call statistics
+      const bulkCalls = filteredCalls.filter((call: CallData) => call.callType === 'bulk' && call.batchId);
+      const batchGroups: { [key: string]: CallData[] } = {};
+      
+      bulkCalls.forEach((call: CallData) => {
+        if (call.batchId) {
+          if (!batchGroups[call.batchId]) {
+            batchGroups[call.batchId] = [];
+          }
+          batchGroups[call.batchId].push(call);
+        }
+      });
+      
+      const bulkCallStats = Object.entries(batchGroups).map(([batchId, calls]) => {
+        const completedInBatch = calls.filter(c => c.status === 'completed' && c.evaluation?.result);
+        const yesInBatch = completedInBatch.filter(c => c.evaluation?.result === 'YES').length;
+        const noInBatch = completedInBatch.filter(c => c.evaluation?.result === 'NO').length;
+        const maybeInBatch = completedInBatch.filter(c => c.evaluation?.result === 'MAYBE').length;
+        
+        return {
+          batchId,
+          moduleName: calls[0]?.moduleName || 'Unknown',
+          totalCalls: calls.length,
+          yesCount: yesInBatch,
+          noCount: noInBatch,
+          maybeCount: maybeInBatch,
+          conversionRate: completedInBatch.length > 0 ? (yesInBatch / completedInBatch.length) * 100 : 0,
+          date: calls[0]?.createdAt || ''
+        };
+      }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
       const processedData: AnalyticsData = {
         totalCalls,
         completedCalls,
@@ -182,6 +283,9 @@ const AnalyticsPage: React.FC = () => {
         recentCalls,
         statusDistribution,
         dailyCalls,
+        resultDistribution,
+        bulkCallStats,
+        moduleWiseResults,
       };
 
       setAnalyticsData(processedData);
@@ -293,6 +397,24 @@ const AnalyticsPage: React.FC = () => {
       case 'no-answer': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
       case 'canceled': return 'bg-red-500/20 text-red-400 border-red-500/30';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    }
+  };
+
+  const getResultColor = (result: 'YES' | 'NO' | 'MAYBE') => {
+    switch (result) {
+      case 'YES': return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'NO': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'MAYBE': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    }
+  };
+
+  const getResultIcon = (result: 'YES' | 'NO' | 'MAYBE') => {
+    switch (result) {
+      case 'YES': return <CheckCircle className="w-4 h-4" />;
+      case 'NO': return <XCircle className="w-4 h-4" />;
+      case 'MAYBE': return <AlertTriangle className="w-4 h-4" />;
+      default: return <Activity className="w-4 h-4" />;
     }
   };
 
@@ -481,76 +603,201 @@ const AnalyticsPage: React.FC = () => {
           </Card>
         </div>
 
-        {/* Charts and Visualizations */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {/* Daily Calls Chart */}
-          <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4 sm:mb-6">
-              <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">Daily Calls (Last 7 Days)</h3>
-              <Badge variant="outline" className="text-xs text-white">This {timeRange}</Badge>
+        {/* AI Result Distribution */}
+        <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6 mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
+            <div>
+              <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">AI Evaluation Results</h3>
+              <p className="text-xs text-zinc-400 mt-1">Lead qualification from customer conversations</p>
             </div>
-            <div className="space-y-3">
-              {analyticsData?.dailyCalls.length > 0 ? (
-                analyticsData.dailyCalls.map((day, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm text-white">{day.date}</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 sm:w-32 bg-zinc-800 rounded-full h-2">
-                        <div 
-                          className="bg-blue-500 h-2 rounded-full" 
-                          style={{ width: `${Math.max((day.count / Math.max(...analyticsData.dailyCalls.map(d => d.count), 1)) * 100, 5)}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-xs sm:text-sm text-zinc-400 min-w-[2rem] text-right">{day.count}</span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-zinc-400 text-sm">No data for the last 7 days</p>
+            <div className="flex items-center gap-3">
+              {/* Module Filter Dropdown */}
+              <select
+                value={selectedModuleFilter}
+                onChange={(e) => setSelectedModuleFilter(e.target.value)}
+                className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 hover:bg-zinc-700 transition-colors"
+              >
+                <option value="all">All Modules</option>
+                {analyticsData?.moduleWiseResults && Object.keys(analyticsData.moduleWiseResults).map((moduleName) => (
+                  <option key={moduleName} value={moduleName}>{moduleName}</option>
+                ))}
+              </select>
+              <Badge variant="outline" className="text-xs text-white">
+                {selectedModuleFilter === 'all' 
+                  ? `${analyticsData?.resultDistribution.total || 0} Total`
+                  : `${analyticsData?.moduleWiseResults?.[selectedModuleFilter]?.total || 0} Calls`
+                }
+              </Badge>
+            </div>
+          </div>
+          
+          {(() => {
+            const displayData = selectedModuleFilter === 'all' 
+              ? analyticsData?.resultDistribution
+              : analyticsData?.moduleWiseResults?.[selectedModuleFilter];
+            
+            if (!displayData || displayData.total === 0) {
+              return (
+                <div className="text-center py-8">
+                  <p className="text-zinc-400 text-sm">No evaluation data available for this module</p>
                 </div>
-              )}
-            </div>
-            <div className="mt-4 pt-4 border-t border-zinc-800">
-              <p className="text-xs text-zinc-500">
-                Total calls this week: {analyticsData?.dailyCalls.reduce((sum, day) => sum + day.count, 0) || 0}
-              </p>
-            </div>
-          </Card>
+              );
+            }
+            
+            return (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                  {/* Yes Count */}
+                  <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-green-400 font-medium">YES</span>
+                      <CheckCircle className="w-5 h-5 text-green-400" />
+                    </div>
+                    <p className="text-2xl font-bold text-white">{displayData.yes || 0}</p>
+                    <p className="text-xs text-zinc-400 mt-1">
+                      {displayData.total > 0 
+                        ? `${((displayData.yes / displayData.total) * 100).toFixed(1)}%`
+                        : '0%'} conversion
+                    </p>
+                  </div>
 
-          {/* Status Distribution */}
-          <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4 sm:mb-6">
-              <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">Call Status</h3>
-              <Badge variant="outline" className="text-xs text-white">Distribution</Badge>
-            </div>
-            <div className="space-y-3 sm:space-y-4">
-              {analyticsData?.statusDistribution.length > 0 ? (
-                analyticsData.statusDistribution.map((status) => (
-                  <div key={status.status} className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className={`w-3 h-3 rounded-full mr-2 sm:mr-3 ${getStatusColor(status.status).split(' ')[0]}`}></div>
-                      <span className="text-xs sm:text-sm md:text-base text-white capitalize">{status.status}</span>
+                  {/* No Count */}
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-red-400 font-medium">NO</span>
+                      <XCircle className="w-5 h-5 text-red-400" />
                     </div>
-                    <div className="flex items-center">
-                      <span className="text-xs sm:text-sm text-zinc-400 mr-2">{status.count}</span>
-                      <span className="text-xs text-zinc-500">({status.percentage.toFixed(1)}%)</span>
+                    <p className="text-2xl font-bold text-white">{displayData.no || 0}</p>
+                    <p className="text-xs text-zinc-400 mt-1">
+                      {displayData.total > 0 
+                        ? `${((displayData.no / displayData.total) * 100).toFixed(1)}%`
+                        : '0%'} rejected
+                    </p>
+                  </div>
+
+                  {/* Maybe Count */}
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-yellow-400 font-medium">MAYBE</span>
+                      <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                    </div>
+                    <p className="text-2xl font-bold text-white">{displayData.maybe || 0}</p>
+                    <p className="text-xs text-zinc-400 mt-1">
+                      {displayData.total > 0 
+                        ? `${((displayData.maybe / displayData.total) * 100).toFixed(1)}%`
+                        : '0%'} pending
+                    </p>
+                  </div>
+                </div>
+
+                {/* Visual Bar */}
+                <div className="w-full h-4 bg-zinc-800 rounded-full overflow-hidden flex">
+                  <div 
+                    className="bg-green-500 h-full transition-all duration-500"
+                    style={{ 
+                      width: displayData.total > 0 
+                        ? `${(displayData.yes / displayData.total) * 100}%` 
+                        : '0%' 
+                    }}
+                  ></div>
+                  <div 
+                    className="bg-red-500 h-full transition-all duration-500"
+                    style={{ 
+                      width: displayData.total > 0 
+                        ? `${(displayData.no / displayData.total) * 100}%` 
+                        : '0%' 
+                    }}
+                  ></div>
+                  <div 
+                    className="bg-yellow-500 h-full transition-all duration-500"
+                    style={{ 
+                      width: displayData.total > 0 
+                        ? `${(displayData.maybe / displayData.total) * 100}%` 
+                        : '0%' 
+                    }}
+                  ></div>
+                </div>
+              </>
+            );
+          })()}
+        </Card>
+
+        {/* Bulk Call Statistics */}
+        {analyticsData?.bulkCallStats && analyticsData.bulkCallStats.length > 0 && (
+          <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6 mb-6 sm:mb-8">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <div>
+                <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">Bulk Call Campaigns</h3>
+                <p className="text-xs text-zinc-400 mt-1">Performance metrics for batch calling</p>
+              </div>
+              <Badge variant="outline" className="text-xs text-white">
+                {analyticsData.bulkCallStats.length} Campaigns
+              </Badge>
+            </div>
+
+            <div className="space-y-4">
+              {analyticsData.bulkCallStats.map((batch) => (
+                <div key={batch.batchId} className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-sm font-semibold text-white">{batch.moduleName}</h4>
+                        <Badge className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30">
+                          Bulk
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-zinc-400">
+                        {formatDate(batch.date)} • {batch.totalCalls} contacts
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-green-400">{batch.conversionRate.toFixed(1)}%</p>
+                      <p className="text-xs text-zinc-500">conversion</p>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-zinc-400 text-sm">No status data available</p>
+
+                  {/* Results Breakdown */}
+                  <div className="grid grid-cols-3 gap-3 mb-3">
+                    <div className="text-center">
+                      <p className="text-xl font-bold text-green-400">{batch.yesCount}</p>
+                      <p className="text-xs text-zinc-400">Yes</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xl font-bold text-red-400">{batch.noCount}</p>
+                      <p className="text-xs text-zinc-400">No</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xl font-bold text-yellow-400">{batch.maybeCount}</p>
+                      <p className="text-xs text-zinc-400">Maybe</p>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full h-2 bg-zinc-700 rounded-full overflow-hidden flex">
+                    <div 
+                      className="bg-green-500 h-full"
+                      style={{ 
+                        width: batch.totalCalls > 0 ? `${(batch.yesCount / batch.totalCalls) * 100}%` : '0%' 
+                      }}
+                    ></div>
+                    <div 
+                      className="bg-red-500 h-full"
+                      style={{ 
+                        width: batch.totalCalls > 0 ? `${(batch.noCount / batch.totalCalls) * 100}%` : '0%' 
+                      }}
+                    ></div>
+                    <div 
+                      className="bg-yellow-500 h-full"
+                      style={{ 
+                        width: batch.totalCalls > 0 ? `${(batch.maybeCount / batch.totalCalls) * 100}%` : '0%' 
+                      }}
+                    ></div>
+                  </div>
                 </div>
-              )}
-            </div>
-            <div className="mt-4 pt-4 border-t border-zinc-800">
-              <p className="text-xs text-zinc-500">
-                Success rate: {analyticsData?.successRate.toFixed(1)}%
-              </p>
+              ))}
             </div>
           </Card>
-        </div>
+        )}
 
         {/* Recent Calls Table */}
         <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
@@ -624,10 +871,11 @@ const AnalyticsPage: React.FC = () => {
                             className="w-4 h-4 text-blue-600 bg-zinc-800 border-zinc-600 rounded focus:ring-blue-500 focus:ring-2"
                           />
                         </th>
-                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Module</th>
                         <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Customer</th>
-                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Status</th>
+                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Module</th>
+                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Type</th>
                         <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Duration</th>
+                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Result</th>
                         <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Date</th>
                         <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Actions</th>
                       </tr>
@@ -644,23 +892,31 @@ const AnalyticsPage: React.FC = () => {
                             />
                           </td>
                           <td className="py-4 px-4">
-                            <span className="text-xs sm:text-sm text-white truncate block max-w-[120px] sm:max-w-[150px]">{call.moduleName || 'Unknown Module'}</span>
-                          </td>
-                          <td className="py-4 px-4">
                             <div>
                               <span className="text-xs sm:text-sm text-white block truncate max-w-[120px] sm:max-w-[150px] font-medium">{call.customerName}</span>
                               <span className="text-xs text-zinc-400 truncate block max-w-[120px] sm:max-w-[150px]">{call.phoneNumber}</span>
                             </div>
                           </td>
                           <td className="py-4 px-4">
-                            <Badge className={`text-xs ${getStatusColor(call.status)}`}>
-                              <span className="mr-1">{getStatusIcon(call.status)}</span>
-                              <span className="hidden sm:inline">{call.status}</span>
-                              <span className="sm:hidden">{call.status.charAt(0)}</span>
+                            <span className="text-xs sm:text-sm text-white truncate block max-w-[120px] sm:max-w-[150px]">{call.moduleName || 'Unknown'}</span>
+                          </td>
+                          <td className="py-4 px-4">
+                            <Badge className={`text-xs ${call.callType === 'bulk' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-purple-500/20 text-purple-400 border-purple-500/30'}`}>
+                              {call.callType === 'bulk' ? 'Bulk' : 'Individual'}
                             </Badge>
                           </td>
                           <td className="py-4 px-4">
                             <span className="text-xs sm:text-sm text-white font-medium">{formatDuration(call.duration)}</span>
+                          </td>
+                          <td className="py-4 px-4">
+                            {call.evaluation?.result ? (
+                              <Badge className={`text-xs ${getResultColor(call.evaluation.result)}`}>
+                                <span className="mr-1">{getResultIcon(call.evaluation.result)}</span>
+                                <span>{call.evaluation.result}</span>
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-zinc-500">Pending</span>
+                            )}
                           </td>
                           <td className="py-4 px-4">
                             <span className="text-xs text-zinc-400">{formatDate(call.createdAt)}</span>

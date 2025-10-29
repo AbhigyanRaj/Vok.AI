@@ -9,15 +9,18 @@ import { fileURLToPath } from 'url';
 // Load environment variables FIRST
 dotenv.config();
 
-// Debug environment loading
-console.log('🔧 Environment variables loaded:');
-console.log('ELEVENLABS_API_KEY:', process.env.ELEVENLABS_API_KEY ? 'SET' : 'NOT SET');
-console.log('BASE_URL:', process.env.BASE_URL || 'NOT SET');
+// Validate environment variables
+import { validateEnvironment } from './utils/envValidator.js';
+if (!validateEnvironment()) {
+  console.error('❌ Server cannot start due to missing environment variables');
+  process.exit(1);
+}
 
 // Import database and utilities
 import connectDB from './config/database.js';
 import { getDBStatus } from './utils/dbUtils.js';
 import { initializeDatabase, checkDatabaseHealth, checkAudioDirectoryHealth } from './utils/initDB.js';
+import { initializeSharedAudioLibrary } from './services/audioCache.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -30,6 +33,18 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Debug: Check if environment variables are loaded
+
+// Serve generated audio files statically with proper headers
+app.use('/audio', (req, res, next) => {
+  // Set CORS headers for audio files
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, ngrok-skip-browser-warning');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  res.header('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+  next();
+}, express.static(path.resolve('src/audio')));
 
 // Serve sample-audio files statically with proper headers
 app.use('/sample-audio', (req, res, next) => {
@@ -49,15 +64,16 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
-// CORS configuration
+// CORS configuration - Allow all origins in development
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://vok-ai.vercel.app', 'https://vok-ai.onrender.com'] // Vercel frontend domain
-    : ['http://localhost:3000', 'http://localhost:5173'],
+    ? ['https://vok-ai.vercel.app', 'https://vok-ai.onrender.com']
+    : true, // Allow all origins in development
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'ngrok-skip-browser-warning']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'ngrok-skip-browser-warning', 'Accept'],
+  exposedHeaders: ['Content-Type', 'Authorization']
 };
 app.use(cors(corsOptions));
 
@@ -89,6 +105,21 @@ const startServer = async () => {
     // Initialize database (create indexes, etc.)
     if (process.env.NODE_ENV === 'development') {
       await initializeDatabase();
+    }
+    
+    // Initialize shared audio library (only if ElevenLabs API key is set)
+    // This will check cache first, so it won't regenerate existing audio
+    if (process.env.ELEVENLABS_API_KEY) {
+      console.log('🎤 Initializing shared audio library...');
+      try {
+        await initializeSharedAudioLibrary('RACHEL');
+        console.log('✅ Shared audio library ready');
+      } catch (error) {
+        console.warn('⚠️ Failed to initialize shared audio library:', error.message);
+        console.warn('   Calls will still work with Twilio TTS fallback');
+      }
+    } else {
+      console.log('⚠️ ElevenLabs API key not set - skipping audio library initialization');
     }
     
     // Start the server

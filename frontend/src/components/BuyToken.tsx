@@ -1,170 +1,208 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "./ui/button";
-import { CreditCard, Package, Zap, Check } from "lucide-react";
+import { Check, Zap, Rocket, Building2 } from "lucide-react";
 import * as auth from "../lib/auth";
 
 const BuyToken: React.FC = () => {
-  const { user } = useAuth();
-  const [userTokens, setUserTokens] = useState<number | null>(null);
+  const { user, setUser } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState("");
 
-  useEffect(() => {
-    const fetchTokens = async () => {
-      if (user) {
-        const profile = await auth.getUserProfile(user._id);
-        setUserTokens(profile ? profile.tokens : 0);
-      }
-    };
-    fetchTokens();
-  }, [user]);
-
-  const handleBuyTokens = async (amount: number) => {
+  const handleUpgrade = async (tier: string) => {
     if (!user) return;
     
     setLoading(true);
     try {
-      await auth.incrementUserTokens(user._id, amount);
-      setSuccess(`Successfully added ${amount} tokens!`);
-      
-      // Refresh token count
-      const profile = await auth.getUserProfile(user._id);
-      setUserTokens(profile ? profile.tokens : 0);
-      
-      setTimeout(() => setSuccess(""), 3000);
+      const updatedUser = await auth.upgradePlan(tier);
+      if (updatedUser && setUser) {
+        setUser(updatedUser);
+      }
     } catch (error) {
-      console.error("Error buying tokens:", error);
+      console.error('Error upgrading plan:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const tokenPackages = [
+  const handleContactSales = () => {
+    window.location.href = 'mailto:sales@vok.ai?subject=Enterprise Plan Inquiry';
+  };
+
+  const subscriptionPlans = [
     {
-      name: "Starter",
-      tokens: 200,
-      price: "₹99",
+      name: "Free",
+      tier: "free",
+      price: "₹0",
+      period: "forever",
+      icon: <Zap className="w-6 h-6 text-zinc-500" />,
       popular: false,
-      features: ["40 Voice Calls", "Basic Analytics", "Email Support", "Standard Voice Quality"]
+      callsPerDay: 10,
+      maxModules: 3,
+      features: [
+        "10 calls per day",
+        "3 voice modules",
+        "5 questions per module",
+        "Basic AI evaluation",
+        "Twilio TTS voice",
+        "7-day analytics retention",
+        "Email support"
+      ]
     },
     {
-      name: "Professional",
-      tokens: 1000,
-      price: "₹399",
+      name: "Pro",
+      tier: "pro",
+      price: "₹29",
+      period: "month",
+      icon: <Rocket className="w-6 h-6 text-blue-400" />,
       popular: true,
-      features: ["200 Voice Calls", "Advanced Analytics", "Priority Support", "Custom Modules", "HD Voice Quality"]
+      callsPerDay: 100,
+      maxModules: 20,
+      features: [
+        "100 calls per day",
+        "20 voice modules",
+        "15 questions per module",
+        "Advanced AI evaluation",
+        "Premium ElevenLabs voices",
+        "Bulk calling (50 contacts)",
+        "90-day analytics retention",
+        "Priority email support",
+        "Export data (CSV/Excel)"
+      ]
     },
     {
-      name: "Business",
-      tokens: 3000,
-      price: "₹999",
+      name: "Enterprise",
+      tier: "enterprise",
+      price: "Custom",
+      period: "pricing",
+      icon: <Building2 className="w-6 h-6 text-zinc-500" />,
       popular: false,
-      features: ["600 Voice Calls", "Full Analytics", "24/7 Support", "Custom Integration", "API Access", "Premium Voice Quality"]
+      callsPerDay: "Unlimited",
+      maxModules: "Unlimited",
+      features: [
+        "Unlimited calls per day",
+        "Unlimited voice modules",
+        "Unlimited questions",
+        "Custom AI evaluation criteria",
+        "Custom voice cloning",
+        "Unlimited bulk calling",
+        "Forever analytics retention",
+        "Dedicated account manager",
+        "Phone support",
+        "API access + Webhooks",
+        "White-label option",
+        "Custom integrations"
+      ]
     }
   ];
 
   return (
-    <div className="min-h-screen flex flex-col items-center bg-zinc-950 px-2 sm:px-4 py-8 sm:py-10 pt-24">
-      <div className="w-full max-w-6xl mx-auto flex flex-col items-center mt-12 sm:mt-20">
+    <div className="min-h-screen bg-zinc-950 px-4 py-8 pt-24">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8 sm:mb-12">
-          <h1 className="text-3xl sm:text-4xl font-bold text-white font-sans mb-4">
-            Buy Tokens
+        <div className="text-center mb-10">
+          <h1 className="text-2xl font-semibold text-white mb-2">
+            Choose Your Plan
           </h1>
-          <p className="text-zinc-400 text-lg max-w-2xl">
-            Choose a package to get started with voice-powered complaint logging
+          <p className="text-zinc-500 text-xs">
+            Select the perfect subscription plan for your voice calling needs
           </p>
-          {userTokens !== null && (
-            <div className="mt-4 text-blue-400 font-semibold">
-              Current Balance: {userTokens} tokens
+          {user && (
+            <div className="mt-4 inline-flex items-center gap-2 bg-zinc-900/50 border border-zinc-800 rounded-md px-3 py-1.5">
+              <span className="text-xs text-zinc-400">
+                Current: <span className="font-medium text-zinc-300">{user.subscription?.tier || 'Free'}</span>
+              </span>
             </div>
           )}
         </div>
 
-        {success && (
-          <div className="mb-6 p-4 bg-green-900/30 border border-green-500/30 rounded-lg text-green-400 text-center">
-            {success}
-          </div>
-        )}
-
-        {/* Token Packages */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
-          {tokenPackages.map((pkg, index) => (
+        {/* Subscription Plans */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {subscriptionPlans.map((plan, index) => (
             <div
               key={index}
-              className={`relative bg-zinc-900 border rounded-2xl p-6 shadow-lg transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl ${
-                pkg.popular
-                  ? "border-blue-500 bg-blue-950/20"
-                  : "border-zinc-700 hover:border-zinc-600"
+              className={`relative bg-zinc-900/30 border rounded-lg p-5 transition-all flex flex-col ${
+                plan.popular
+                  ? "border-zinc-700"
+                  : "border-zinc-800"
               }`}
             >
-              {pkg.popular && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-xs font-semibold">
-                    Most Popular
+              {plan.popular && (
+                <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+                  <span className="bg-blue-500/10 border border-blue-500/30 text-blue-400 px-2.5 py-0.5 rounded-md text-xs">
+                    Popular
                   </span>
                 </div>
               )}
 
-              <div className="text-center mb-6">
-                <h3 className="text-xl font-bold text-white mb-2">{pkg.name}</h3>
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-3xl font-bold text-white">{pkg.price}</span>
-                  <span className="text-zinc-400">/month</span>
+              <div className="text-center mb-5">
+                <div className="flex justify-center mb-2">
+                  {plan.icon}
                 </div>
-                <div className="flex items-center justify-center gap-2 text-blue-400 font-semibold">
-                  <Zap className="w-5 h-5" />
-                  <span>{pkg.tokens} tokens</span>
+                <h3 className="text-lg font-semibold text-white mb-1.5">{plan.name}</h3>
+                <div className="flex items-baseline justify-center gap-1 mb-1.5">
+                  <span className="text-2xl font-semibold text-white">{plan.price}</span>
+                  {plan.tier !== "free" && plan.tier !== "enterprise" && (
+                    <span className="text-zinc-500 text-xs">/{plan.period}</span>
+                  )}
+                  {plan.tier === "free" && (
+                    <span className="text-zinc-500 text-xs">{plan.period}</span>
+                  )}
+                </div>
+                <div className="text-xs text-zinc-500">
+                  {typeof plan.callsPerDay === 'number' 
+                    ? `${plan.callsPerDay} calls/day` 
+                    : plan.callsPerDay}
+                  {" • "}
+                  {typeof plan.maxModules === 'number'
+                    ? `${plan.maxModules} modules`
+                    : plan.maxModules}
                 </div>
               </div>
 
-              <ul className="space-y-3 mb-6">
-                {pkg.features.map((feature, featureIndex) => (
-                  <li key={featureIndex} className="flex items-center gap-3 text-zinc-300">
-                    <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
-                    <span className="text-sm">{feature}</span>
+              <ul className="space-y-2 mb-5 flex-grow">
+                {plan.features.map((feature, featureIndex) => (
+                  <li key={featureIndex} className="flex items-start gap-2 text-zinc-400">
+                    <Check className="w-3 h-3 text-zinc-600 flex-shrink-0 mt-0.5" />
+                    <span className="text-xs leading-relaxed">{feature}</span>
                   </li>
                 ))}
               </ul>
 
-              <Button
-                onClick={() => handleBuyTokens(pkg.tokens)}
-                disabled={loading || !user}
-                className={`w-full ${
-                  pkg.popular
-                    ? "bg-blue-500 hover:bg-blue-600"
-                    : "bg-zinc-700 hover:bg-zinc-600"
-                } text-white font-semibold transition-colors`}
-              >
-                {loading ? "Processing..." : `Buy ${pkg.tokens} Tokens`}
-              </Button>
+              {user?.subscription?.tier === plan.tier ? (
+                <Button
+                  disabled
+                  className="w-full py-2 text-xs font-medium rounded-md bg-zinc-800/50 text-zinc-500 cursor-not-allowed border border-zinc-800"
+                >
+                  Current Plan
+                </Button>
+              ) : plan.tier === "enterprise" ? (
+                <Button
+                  onClick={handleContactSales}
+                  className="w-full py-2 text-xs font-medium rounded-md bg-white text-black hover:bg-zinc-100 transition-all"
+                >
+                  Contact Sales
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => handleUpgrade(plan.tier)}
+                  disabled={loading}
+                  className={`w-full py-2 text-xs font-medium rounded-md transition-all ${
+                    plan.popular
+                      ? "bg-blue-500 text-white hover:bg-blue-600"
+                      : "bg-white text-black hover:bg-zinc-100"
+                  }`}
+                >
+                  {loading ? "Processing..." : `Upgrade to ${plan.name}`}
+                </Button>
+              )}
             </div>
           ))}
         </div>
 
         {/* Additional Info */}
-        <div className="mt-12 text-center text-zinc-400 text-sm max-w-2xl">
-          <p className="mb-4">
-            <strong className="text-zinc-200">Cost per call: 5 tokens</strong> - Each voice call consumes 5 tokens. 
-            Unused tokens roll over to the next month.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-            <div className="p-4 bg-zinc-800/50 rounded-lg">
-              <div className="text-blue-400 font-semibold mb-1">Starter Plan</div>
-              <div className="text-xs text-zinc-400">₹99/month = 40 calls</div>
-              <div className="text-xs text-zinc-500">₹2.48 per call</div>
-            </div>
-            <div className="p-4 bg-zinc-800/50 rounded-lg">
-              <div className="text-blue-400 font-semibold mb-1">Professional Plan</div>
-              <div className="text-xs text-zinc-400">₹399/month = 200 calls</div>
-              <div className="text-xs text-zinc-500">₹1.99 per call</div>
-            </div>
-            <div className="p-4 bg-zinc-800/50 rounded-lg">
-              <div className="text-blue-400 font-semibold mb-1">Business Plan</div>
-              <div className="text-xs text-zinc-400">₹999/month = 600 calls</div>
-              <div className="text-xs text-zinc-500">₹1.67 per call</div>
-            </div>
+        <div className="mt-8 text-center">
+          <div className="text-zinc-500 text-xs">
+            <p>Need a custom plan? <span className="text-zinc-400 hover:text-zinc-300 cursor-pointer">Contact sales</span></p>
           </div>
         </div>
       </div>

@@ -5,6 +5,9 @@ import { Button } from "./ui/button";
 import { Plus, X, Loader2 } from "lucide-react";
 import Modal from "./ui/modal";
 
+// Translation feature removed - unreliable unofficial API
+// Users can create modules in any language directly
+
 interface CreateModuleProps {
   open: boolean;
   onClose: () => void;
@@ -163,7 +166,7 @@ const CreateModule: React.FC<CreateModuleProps> = ({ open, onClose }) => {
                 Creating Module...
               </>
             ) : (
-              "Create Module"
+              'Create Module'
             )}
           </Button>
         </form>

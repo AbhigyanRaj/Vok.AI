@@ -19,27 +19,6 @@ router.post('/google', async (req, res) => {
       });
     }
 
-    // Check if database is available
-    if (!isDBConnected()) {
-      console.log('⚠️  Database not available - using mock user');
-      const mockUser = getMockUser();
-      const token = generateToken(mockUser._id);
-      
-      return res.json({
-        success: true,
-        user: {
-          _id: mockUser._id,
-          name: mockUser.name,
-          email: mockUser.email,
-          tokens: mockUser.tokens,
-          subscription: mockUser.subscription,
-          totalCallsMade: mockUser.totalCallsMade,
-        },
-        token,
-        warning: 'Running in development mode without database'
-      });
-    }
-
     let user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
@@ -114,7 +93,7 @@ router.post('/google', async (req, res) => {
         name: user.name,
         email: user.email,
         tokens: user.tokens,
-        subscription: user.subscription,
+        subscription: user.subscription || { tier: 'free', status: 'active' },
         totalCallsMade: user.totalCallsMade,
       },
       token,
@@ -131,28 +110,6 @@ router.post('/google', async (req, res) => {
 // Get current user (protected route)
 router.get('/me', protect, async (req, res) => {
   try {
-    // Check if database is available
-    if (!isDBConnected()) {
-      console.log('⚠️  Database not available - returning mock user');
-      const mockUser = getMockUser(req.user._id);
-      
-      return res.json({
-        success: true,
-        user: {
-          _id: mockUser._id,
-          name: mockUser.name,
-          email: mockUser.email,
-          tokens: mockUser.tokens,
-          subscription: mockUser.subscription,
-          totalCallsMade: mockUser.totalCallsMade,
-          isActive: mockUser.isActive,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        warning: 'Running in development mode without database'
-      });
-    }
-
     const user = await User.findById(req.user._id).select('-googleId');
     
     if (!user) {
@@ -166,7 +123,7 @@ router.get('/me', protect, async (req, res) => {
         name: user.name,
         email: user.email,
         tokens: user.tokens,
-        subscription: user.subscription,
+        subscription: user.subscription || { tier: 'free', status: 'active' },
         totalCallsMade: user.totalCallsMade,
         isActive: user.isActive,
         createdAt: user.createdAt,
@@ -208,7 +165,7 @@ router.put('/profile', protect, async (req, res) => {
         name: user.name,
         email: user.email,
         tokens: user.tokens,
-        subscription: user.subscription,
+        subscription: user.subscription || { tier: 'free', status: 'active' },
       }
     });
   } catch (error) {
@@ -270,7 +227,7 @@ router.get('/stats', protect, async (req, res) => {
       stats: {
         totalCallsMade: user.totalCallsMade,
         tokensRemaining: user.tokens,
-        subscription: user.subscription,
+        subscription: user.subscription || { tier: 'free', status: 'active' },
         accountAge: Math.floor((Date.now() - user.createdAt) / (1000 * 60 * 60 * 24)), // days
       }
     });
@@ -278,6 +235,51 @@ router.get('/stats', protect, async (req, res) => {
     console.error('Get stats error:', error);
     res.status(500).json({ 
       error: 'Failed to get statistics',
+      message: error.message 
+    });
+  }
+});
+
+// Update subscription plan
+router.post('/upgrade-plan', protect, async (req, res) => {
+  try {
+    const { tier } = req.body;
+    
+    if (!tier || !['free', 'pro', 'enterprise'].includes(tier)) {
+      return res.status(400).json({ error: 'Invalid subscription tier' });
+    }
+
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update subscription
+    user.subscription = {
+      tier: tier,
+      status: 'active',
+      startDate: new Date(),
+      endDate: tier === 'free' ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+    };
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: `Successfully upgraded to ${tier} plan`,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        tokens: user.tokens,
+        subscription: user.subscription,
+      }
+    });
+  } catch (error) {
+    console.error('Upgrade plan error:', error);
+    res.status(500).json({ 
+      error: 'Failed to upgrade plan',
       message: error.message 
     });
   }

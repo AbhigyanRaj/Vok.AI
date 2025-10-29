@@ -38,3 +38,15 @@ backend/src/audio/voice_sample_*.mp3
 *.njsproj
 *.sln
 *.sw?
+
+# Sample audio files
+backend/sample-audio/*.mp3
+backend/sample-audio/**/*.mp3
+
+# Other audio formats
+*.wav
+*.ogg
+*.flac
+
+# Backend test env files
+backend/.env.*

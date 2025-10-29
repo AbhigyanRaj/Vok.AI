@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { LogOut, Menu, User, X, Home, Layers, BarChart3, Settings, Coins, Plus } from "lucide-react";
-import * as auth from "../lib/auth";
+import { LogOut, Menu, User, X, Layers, BarChart3, Settings, Crown } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import Modal from "./ui/modal";
 import { Button } from "./ui/button";
@@ -9,19 +8,13 @@ import { Button } from "./ui/button";
 const Navbar: React.FC = () => {
   const { user, signOut, signIn, loading } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [userTokens, setUserTokens] = useState<number | null>(null);
   const [authModal, setAuthModal] = useState<null | 'signup' | 'login'>(null);
   const location = useLocation();
 
-  React.useEffect(() => {
-    const fetchTokens = async () => {
-      if (user) {
-        const profile = await auth.getUserProfile(user._id);
-        setUserTokens(profile ? profile.tokens : user.tokens);
-      }
-    };
-    fetchTokens();
-  }, [user]);
+  // Get actual subscription tier from user profile
+  const userPlan = user?.subscription?.tier ? 
+    user.subscription.tier.charAt(0).toUpperCase() + user.subscription.tier.slice(1) : 
+    "Free";
 
   const handleSignOut = async () => {
     try {
@@ -83,26 +76,22 @@ const Navbar: React.FC = () => {
               </div>
             )}
 
-            {/* Div 3: User Elements (Buy Tokens, Token Display, User Info) - Desktop Only */}
+            {/* Div 3: User Elements (Plan Badge, User Info) - Desktop Only */}
             <div className="hidden lg:flex items-center space-x-3">
               {user ? (
                 <>
-                  {/* Buy Tokens Button */}
+                  {/* Plan Badge */}
                   <Link
                     to="/buy-token"
-                    className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
+                    className="flex items-center gap-1.5 bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700 rounded-md px-3 py-1.5 transition-colors group"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    Buy Tokens
-                  </Link>
-
-                  {/* Token Display */}
-                  <div className="flex items-center gap-1.5 bg-blue-500/20 border border-blue-500/30 rounded-md px-2.5 py-1.5">
-                    <Coins className="w-3.5 h-3.5 text-blue-400" />
-                    <span className="text-xs font-medium text-white">
-                      {userTokens !== null ? userTokens : user.tokens} tokens
+                    <Crown className={`w-3.5 h-3.5 group-hover:text-blue-300 ${
+                      userPlan === 'Pro' ? 'text-blue-400' : 'text-zinc-500'
+                    }`} />
+                    <span className="text-xs font-medium text-zinc-300 group-hover:text-white">
+                      {userPlan}
                     </span>
-                  </div>
+                  </Link>
 
                   {/* User Info & Logout */}
                   <div className="flex items-center space-x-1.5">
@@ -176,23 +165,15 @@ const Navbar: React.FC = () => {
                   ))}
                 </div>
                 
-                {/* Mobile Buy Tokens Button */}
+                {/* Mobile Plan Badge */}
                 <Link
                   to="/buy-token"
                   className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors text-zinc-300 hover:text-white hover:bg-zinc-800"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  <Plus className="w-4 h-4" />
-                  Buy Tokens
+                  <Crown className="w-4 h-4 text-blue-400" />
+                  Plan: {userPlan}
                 </Link>
-                
-                {/* Mobile Token Display */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg">
-                  <Coins className="w-4 h-4 text-blue-400" />
-                  <span className="text-xs font-medium text-white">
-                    {userTokens !== null ? userTokens : user.tokens} tokens
-                  </span>
-                </div>
 
                 {/* Mobile User Info */}
                 <div className="flex items-center justify-between px-3 py-2">

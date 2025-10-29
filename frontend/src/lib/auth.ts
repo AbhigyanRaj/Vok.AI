@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://2d7aa02d9e18.ngrok-free.app/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
 
 // JWT-based authentication with Google OAuth
 export interface User {
@@ -6,7 +6,12 @@ export interface User {
   name: string;
   email: string;
   tokens: number;
-  subscription: string;
+  subscription: {
+    tier: string;
+    status: string;
+    startDate?: Date;
+    endDate?: Date;
+  };
   totalCallsMade: number;
 }
 
@@ -158,6 +163,35 @@ export const incrementUserTokens = async (userId: string, amount: number): Promi
     }
   } catch (error) {
     console.error('Error incrementing tokens:', error);
+  }
+};
+
+export const upgradePlan = async (tier: string): Promise<User | null> => {
+  const token = getStoredToken();
+  if (!token) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/upgrade-plan`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ tier }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      // Update stored user with new subscription
+      if (data.user) {
+        setStoredUser(data.user);
+        return data.user;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Error upgrading plan:', error);
+    return null;
   }
 };
 

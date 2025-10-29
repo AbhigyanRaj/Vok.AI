@@ -1,257 +1,169 @@
 <div align="center">
   <img src="frontend/public/logo.png" alt="Vok.AI Logo" width="120"/>
   
-<<<<<<< HEAD
-=======
   # Vok.AI
->>>>>>> 71d8eea (feat: Implement voice preview caching system with direct MP3 file access)
-  **🎙️ Voice-powered communication & productivity platform**
   
-  *Automated calling with AI-powered transcription & analytics*
+  **Voice-powered communication & productivity platform**
   
-  [![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)](https://github.com/AbhigyanRaj/Vok.AI)
-  [![React](https://img.shields.io/badge/React-19-blue)](https://reactjs.org/)
-  [![Node.js](https://img.shields.io/badge/Node.js-18+-green)](https://nodejs.org/)
-  [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green)](https://www.mongodb.com/)
+  Automated calling with AI-driven transcription and analytics
   
-  Built by [Abhigyan Raj](https://github.com/AbhigyanRaj) | IIIT Delhi
+  [![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)](https://github.com/AbhigyanRaj/Vok.AI)
+  [![React](https://img.shields.io/badge/react-19-blue)](https://reactjs.org/)
+  [![Node.js](https://img.shields.io/badge/node.js-18+-green)](https://nodejs.org/)
+  [![MongoDB](https://img.shields.io/badge/mongodb-atlas-green)](https://www.mongodb.com/)
 </div>
 
 ---
 
-## 🎯 What is Vok.AI?
+## Overview
 
-Vok.AI transforms business communication by automating voice calls with AI. Create custom call scripts, make outbound calls, and get intelligent insights - all through an intuitive web interface.
+**Vok.AI** automates high-volume phone outreach for businesses. Build configurable voice modules, place calls at scale, and receive AI-driven transcripts, summaries and analytics in real time—all from a single dashboard.
 
-### ✨ Key Features
+### Features
 
-| Feature | Description |
-|---------|-------------|
-| 🎙️ **Voice Modules** | Create custom call scripts with multiple questions |
-| 📞 **Auto Calling** | Automated outbound calls via Twilio integration |
-| 🤖 **AI Transcription** | Real-time speech-to-text using OpenAI Whisper |
-| 📊 **Smart Analytics** | AI-powered call summaries and insights |
-| 💰 **Token System** | Pay-per-call billing (5 tokens per call) |
-| 🔐 **Secure Auth** | Google OAuth with JWT tokens |
+- Visual module builder with multi-step question flows
+- Automated outbound calling via Twilio
+- Real-time speech-to-text transcription (OpenAI Whisper)
+- GPT-based summaries and sentiment analytics
+- Token-based billing (5 tokens per call)
+- Google OAuth with JWT authentication
 
 ---
 
-## 🏗️ System Architecture
+## System architecture
 
 ```mermaid
 graph TB
-    subgraph "🖥️ Frontend Layer"
-        A[React UI]
-        B[Module Creator]
-        C[Call Dashboard]
-        D[Analytics]
-    end
-    
-    subgraph "⚡ Backend Services"
-        E[Auth API]
-        F[Module API]
-        G[Call Engine]
-        H[User API]
-    end
-    
-    subgraph "🌐 External Services"
-        I[📞 Twilio Voice]
-        J[🎯 OpenAI Whisper]
-        K[🔊 ElevenLabs TTS]
-        L[🗄️ MongoDB Atlas]
-    end
-    
-    A --> E
-    B --> F
-    C --> G
-    D --> H
-    
-    G --> I
-    G --> J
-    G --> K
-    E --> L
-    F --> L
-    G --> L
-    H --> L
-    
-    style A fill:#e1f5fe
-    style G fill:#fff3e0
-    style I fill:#f3e5f5
+  subgraph Frontend
+    A[React 19 / Vite / Tailwind]
+  end
+  subgraph Backend
+    B(Node.js 18 / Express) --> C[(MongoDB Atlas)]
+    B --> D(Twilio Voice)
+    B --> E(OpenAI Whisper & GPT-4)
+    B --> F(ElevenLabs TTS)
+  end
+  A --> B
 ```
 
 ---
 
-## 🚀 Quick Start
+## Quick start
 
-### 📋 Prerequisites
+### Prerequisites
 
-- **Node.js** v18+
-- **MongoDB Atlas** account
-- **Twilio** account
-- **OpenAI** API key
-- **Google OAuth** credentials
+- Node.js 18+
+- MongoDB Atlas account
+- Twilio account with phone number
+- OpenAI API key
+- Google OAuth credentials
 
-### ⚡ Installation
+### Installation
 
 ```bash
-# 1️⃣ Clone the repository
-git clone https://github.com/AbhigyanRaj/Vok.AI.git
-cd Vok.AI
+# Clone repository
+git clone https://github.com/AbhigyanRaj/Vok.AI.git && cd Vok.AI
 
-# 2️⃣ Backend setup
+# Backend setup
 cd backend
 npm install
-cp env.example .env
-# Configure your .env file
+cp env.example .env  # Edit .env with your credentials
 npm run dev
 
-# 3️⃣ Frontend setup (new terminal)
+# Frontend setup (new terminal)
 cd ../frontend
 npm install
 npm run dev
 ```
 
-### 🔧 Environment Setup
+The API runs on `http://localhost:5001`; the web app on `http://localhost:5173` by default.
+
+### Environment variables
 
 <details>
-<summary><b>Backend Environment Variables</b></summary>
+<summary>Backend (.env)</summary>
 
 ```env
-# Server Configuration
 PORT=5001
 NODE_ENV=development
 BASE_URL=http://localhost:5001
 
-# Database
-MONGODB_URI=your_mongodb_atlas_connection_string
+MONGODB_URI=mongodb+srv://<user>:<pass>@cluster.mongodb.net/vokai
 
-# Authentication
-JWT_SECRET=your_jwt_secret_here
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
+JWT_SECRET=change_me
+GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_secret
 
-# Twilio Integration
-TWILIO_ACCOUNT_SID=your_twilio_account_sid
-TWILIO_AUTH_TOKEN=your_twilio_auth_token
-TWILIO_PHONE_NUMBER=your_twilio_phone_number
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_PHONE_NUMBER=+15551234567
 
-# AI Services
-OPENAI_API_KEY=your_openai_api_key
-ELEVENLABS_API_KEY=your_elevenlabs_api_key
+OPENAI_API_KEY=sk-...
+ELEVENLABS_API_KEY=sk_...
 ```
 </details>
 
 <details>
-<summary><b>Frontend Environment Variables</b></summary>
+<summary>Frontend (.env)</summary>
 
 ```env
 VITE_API_URL=http://localhost:5001/api
-VITE_GOOGLE_OAUTH_CLIENT_ID=your_google_oauth_client_id
+VITE_GOOGLE_OAUTH_CLIENT_ID=xxx.apps.googleusercontent.com
 ```
 </details>
 
 ---
 
-## 🛠️ Tech Stack
+## Tech stack
 
-<div align="center">
-
-### Frontend
-![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript)
-![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite)
-![Tailwind](https://img.shields.io/badge/Tailwind-38B2AC?style=for-the-badge&logo=tailwind-css)
-
-### Backend
-![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js)
-![Express](https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express)
-![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb)
-![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=json-web-tokens)
-
-### Services
-![Twilio](https://img.shields.io/badge/Twilio-F22F46?style=for-the-badge&logo=twilio)
-![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai)
-![Google](https://img.shields.io/badge/Google_OAuth-4285F4?style=for-the-badge&logo=google)
-
-</div>
+| Layer      | Technologies                                   |
+|------------|------------------------------------------------|
+| Frontend   | React 19, TypeScript, Vite, Tailwind CSS      |
+| Backend    | Node.js 18, Express, Mongoose                 |
+| Services   | Twilio Voice, OpenAI, ElevenLabs, Google OAuth |
+| Database   | MongoDB Atlas                                  |
 
 ---
 
-## 📊 Call Flow Diagram
+## Operational flow
 
 ```mermaid
 sequenceDiagram
-    participant 👤 User
-    participant 🖥️ Frontend
-    participant ⚡ Backend
-    participant 📞 Twilio
-    participant 🔊 ElevenLabs
-    participant 🤖 OpenAI
-    participant 🗄️ Database
+    participant User
+    participant UI as Web UI
+    participant API as API Server
+    participant Twilio
+    participant TTS as ElevenLabs
+    participant STT as OpenAI
+    participant DB as MongoDB
 
-    👤->>🖥️: Create Module
-    🖥️->>⚡: POST /api/modules
-    ⚡->>🗄️: Save Module
-    
-    👤->>🖥️: Initiate Call
-    🖥️->>⚡: POST /api/calls/initiate
-    ⚡->>🔊: Generate TTS
-    ⚡->>📞: Make Call
-    📞->>👤: Ring Phone
-    
-    👤->>📞: Answer & Speak
-    📞->>🤖: Audio → Text
-    🤖->>⚡: Transcription
-    ⚡->>🤖: Generate Summary
-    ⚡->>🗄️: Save Results
-    ⚡->>🖥️: Call Complete
+    User->>UI: Build voice module
+    UI->>API: POST /modules
+    API->>DB: Store module
+
+    User->>UI: Start call
+    UI->>API: POST /calls/initiate
+    API->>TTS: Generate speech
+    API->>Twilio: Place call
+    Twilio-->>User: Call rings
+    Twilio->>STT: Stream audio
+    STT->>API: Transcript
+    API->>DB: Persist results
+    API-->>UI: Completion + analytics
 ```
 
 ---
 
-## 📁 Project Structure
+## API endpoints
 
-```
-Vok.AI/
-├── 🖥️ frontend/                 # React Application
-│   ├── src/
-│   │   ├── components/         # UI Components
-│   │   │   ├── Hero.tsx       # Landing Page
-│   │   │   ├── ModulesPage.tsx # Module Management
-│   │   │   ├── AnalyticsPage.tsx # Call Analytics
-│   │   │   └── ui/            # Reusable Components
-│   │   ├── contexts/          # React Contexts
-│   │   ├── lib/               # Utilities & API
-│   │   └── App.tsx            # Main App
-│   └── package.json
-│
-├── ⚡ backend/                  # Node.js API Server
-│   ├── src/
-│   │   ├── config/            # Service Configurations
-│   │   ├── models/            # Database Schemas
-│   │   │   ├── User.js        # User Model
-│   │   │   ├── Module.js      # Call Module Model
-│   │   │   └── Call.js        # Call Record Model
-│   │   ├── routes/            # API Endpoints
-│   │   ├── middleware/        # Auth & Security
-│   │   └── server.js          # Express Server
-│   └── package.json
-│
-└── 📄 README.md               # This File
-```
-
----
-
-## 🔌 API Reference
-
-### 🔐 Authentication
+### Authentication
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/auth/google` | Google OAuth login |
 | `GET` | `/api/auth/me` | Get current user |
 | `POST` | `/api/auth/buy-tokens` | Purchase tokens |
 
-### 📋 Module Management
+### Module management
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/api/modules` | Get user modules |
@@ -259,18 +171,18 @@ Vok.AI/
 | `PUT` | `/api/modules/:id` | Update module |
 | `DELETE` | `/api/modules/:id` | Delete module |
 
-### 📞 Call Processing
+### Call processing
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/calls/initiate` | Start voice call |
 | `GET` | `/api/calls/history` | Get call history |
-| `POST` | `/api/calls/webhook` | Twilio webhook |
+| `POST` | `/api/calls/webhook` | Twilio webhook handler |
 
 ---
 
-## 🗄️ Database Schema
+## Database schema
 
-### 👤 Users Collection
+### Users
 ```javascript
 {
   email: String (unique),
@@ -282,7 +194,7 @@ Vok.AI/
 }
 ```
 
-### 📋 Modules Collection
+### Modules
 ```javascript
 {
   userId: ObjectId,
@@ -298,7 +210,7 @@ Vok.AI/
 }
 ```
 
-### 📞 Calls Collection
+### Calls
 ```javascript
 {
   userId: ObjectId,
@@ -315,34 +227,32 @@ Vok.AI/
 
 ---
 
-## 🎤 Voice System
+## Voice system
 
-### 🔊 Smart Hybrid TTS
-| Priority | Use Case | Service |
+### Hybrid TTS strategy
+| Priority | Use case | Service |
 |----------|----------|---------|
-| 🔴 **High** | Greeting, First Question, Outro | ElevenLabs |
-| 🟡 **Medium** | Key Questions | ElevenLabs (if available) |
-| 🟢 **Low** | Confirmations, Decline | Twilio TTS |
+| High | Greeting, first question, outro | ElevenLabs |
+| Medium | Key questions | ElevenLabs (if available) |
+| Low | Confirmations, decline | Twilio TTS |
 
-### ⚡ Rate Limits
-- **Per Call**: 3 ElevenLabs requests max
-- **Per Minute**: 5 requests max  
-- **Per Hour**: 20 requests max
-- **Fallback**: Automatic Twilio TTS
+### Rate limits
+- Per call: 3 ElevenLabs requests max
+- Per minute: 5 requests max
+- Per hour: 20 requests max
+- Fallback: Automatic Twilio TTS
 
 ---
 
-## 🚀 Deployment
+## Deployment
 
-### 🌐 Production Setup
+| Component | Platform | URL |
+|-----------|----------|-----|
+| Backend   | Render   | https://vok-ai.onrender.com |
+| Frontend  | Vercel   | https://vok-ai.vercel.app |
+| Database  | MongoDB Atlas | Cloud hosted |
 
-| Service | Platform | URL |
-|---------|----------|-----|
-| **Backend** | Render.com | `https://vok-ai.onrender.com` |
-| **Frontend** | Vercel | `https://vok-ai.vercel.app` |
-| **Database** | MongoDB Atlas | Cloud hosted |
-
-### 🔧 Environment Variables
+### Production environment variables
 ```env
 NODE_ENV=production
 BASE_URL=https://vok-ai.onrender.com
@@ -351,21 +261,21 @@ FRONTEND_URL=https://vok-ai.vercel.app
 
 ---
 
-## 🧪 Testing & Development
+## Development
 
-### 🔍 Health Check Endpoints
+### Health check endpoints
 ```bash
 # General health
 curl https://vok-ai.onrender.com/api/health
 
-# Database status  
+# Database status
 curl https://vok-ai.onrender.com/api/db/status
 
 # Voice system health
 curl https://vok-ai.onrender.com/api/calls/voices/health
 ```
 
-### 🛠️ Local Development with ngrok
+### Local development with ngrok
 ```bash
 # Install ngrok
 brew install ngrok
@@ -382,69 +292,34 @@ export BASE_URL=https://abc123.ngrok.io
 
 ---
 
-## 🐛 Troubleshooting
+## Security
 
-<details>
-<summary><b>🚨 Common Issues & Solutions</b></summary>
-
-### 📞 Twilio Trial Account
-- **Issue**: Can only call verified numbers
-- **Solution**: Add numbers to "Verified Caller IDs" in Twilio Console
-
-### 🔊 Audio Not Playing
-- **Issue**: No audio during calls
-- **Solution**: Ensure `BASE_URL` is publicly accessible (use ngrok locally)
-
-### 🗄️ Database Connection
-- **Issue**: MongoDB connection fails
-- **Solution**: Check connection string and IP whitelist in Atlas
-
-### 🤖 ElevenLabs Errors
-- **Issue**: TTS generation fails
-- **Solution**: Check API key and account limits (auto-fallback to Twilio)
-
-</details>
+- JWT authentication with secure token-based auth
+- Google OAuth for trusted authentication
+- Rate limiting to prevent API abuse
+- CORS protection for cross-origin security
+- Helmet security headers
+- Input validation and request sanitization
 
 ---
 
-## 🔒 Security Features
+## Contributing
 
-- 🛡️ **JWT Authentication** - Secure token-based auth
-- 🔐 **Google OAuth** - Trusted authentication
-- 🚦 **Rate Limiting** - API abuse prevention
-- 🌐 **CORS Protection** - Cross-origin security
-- 🔒 **Helmet Security** - HTTP security headers
-- ✅ **Input Validation** - Request sanitization
+Contributions are welcome. Please fork the repository, create a feature branch, commit your changes and open a pull request.
 
 ---
 
-## 🤝 Contributing
+## License
 
-This project is actively maintained. For collaboration:
-
-1. 🍴 Fork the repository
-2. 🌟 Create a feature branch
-3. 💻 Make your changes
-4. 🧪 Test thoroughly
-5. 📝 Submit a pull request
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License**.
+This project is licensed under the MIT License.
 
 ---
 
 <div align="center">
   
-  ### 🎯 Simple. Fast. Voice-first.
+  **Built by [Abhigyan Raj](https://github.com/AbhigyanRaj) | IIIT Delhi**
   
-  *Built with modern web technologies for the future of communication*
-  
-  [![GitHub](https://img.shields.io/badge/GitHub-AbhigyanRaj-black?style=for-the-badge&logo=github)](https://github.com/AbhigyanRaj)
-  [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/abhigyanraj)
-  
-  **⭐ Star this repo if you find it useful!**
+  [![GitHub](https://img.shields.io/badge/GitHub-AbhigyanRaj-black?style=flat&logo=github)](https://github.com/AbhigyanRaj)
+  [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue?style=flat&logo=linkedin)](https://linkedin.com/in/abhigyanraj)
   
 </div>

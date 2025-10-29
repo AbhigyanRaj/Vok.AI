@@ -14,16 +14,16 @@ const ArrowRightIcon = () => (
 
 const featureData = [
   {
-    icon: <PhoneCall className="w-6 h-6 text-green-500" />, bg: "bg-green-50", title: "Voice Modules", desc: "Custom questions and flows."
+    icon: <Layers className="w-6 h-6 text-blue-500" />, bg: "bg-blue-50", title: "Create Questions", desc: "Build custom lead qualification questions."
   },
   {
-    icon: <PhoneCall className="w-6 h-6 text-yellow-500" />, bg: "bg-yellow-50", title: "Outbound Calls", desc: "Call single or many."
+    icon: <PhoneCall className="w-6 h-6 text-green-500" />, bg: "bg-green-50", title: "Bulk Calling", desc: "Call 100s of customers automatically."
   },
   {
-    icon: <Mic className="w-6 h-6 text-purple-500" />, bg: "bg-purple-50", title: "Transcription", desc: "AI records answers."
+    icon: <Mic className="w-6 h-6 text-purple-500" />, bg: "bg-purple-50", title: "AI Evaluation", desc: "Extract Yes/No/Maybe from conversations."
   },
   {
-    icon: <BarChart3 className="w-6 h-6 text-pink-500" />, bg: "bg-pink-50", title: "Analytics", desc: "See results & insights."
+    icon: <BarChart3 className="w-6 h-6 text-pink-500" />, bg: "bg-pink-50", title: "Smart Analytics", desc: "Track conversion rates per module."
   },
 ];
 
@@ -55,7 +55,6 @@ const Hero: React.FC = () => {
   useEffect(() => {
     if (modalOpen && user) {
       loadUserModules();
-      setModalStep('module-selection');
       setSelectedModule(null);
     }
   }, [modalOpen, user, loadUserModules]);
@@ -69,124 +68,10 @@ const Hero: React.FC = () => {
     }
   };
 
-  const handleModuleSelect = (module: any) => {
-    setSelectedModule(module);
-  };
-
-  const handleProceedWithModule = () => {
-    if (selectedModule) {
-      setModalStep('contact-upload');
-    }
-  };
-
-  const handleBackToModuleSelection = () => {
-    setModalStep('module-selection');
-    setSelectedModule(null);
-  };
-
   const handleModalClose = () => {
     setModalOpen(false);
-    setModalStep('module-selection');
     setSelectedModule(null);
   };
-
-  const renderModuleSelection = () => (
-    <div className="space-y-4 w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto">
-      <div className="text-center mb-4 sm:mb-6">
-        <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white mb-2">Choose a Voice Module</h3>
-        <p className="text-xs sm:text-sm md:text-base text-zinc-300">Select a module to use for your calls</p>
-      </div>
-      
-      {loadingModules ? (
-        <div className="text-center py-6 sm:py-8">
-          <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-white mx-auto"></div>
-          <p className="text-xs sm:text-sm md:text-base text-zinc-400 mt-2">Loading your modules...</p>
-        </div>
-      ) : userModules.length === 0 ? (
-        <div className="text-center py-6 sm:py-8">
-          <Layers className="w-10 h-10 sm:w-12 sm:h-12 text-zinc-400 mx-auto mb-3" />
-          <p className="text-xs sm:text-sm md:text-base text-zinc-300 mb-4">No modules found</p>
-          <Button 
-            onClick={() => {
-              setModalOpen(false);
-              setCreateModuleOpen(true);
-            }}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm md:text-base px-4 py-2"
-          >
-            Create Your First Module
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-2 sm:space-y-3 max-h-48 sm:max-h-56 md:max-h-64 overflow-y-auto px-1">
-          {userModules.map((module) => (
-            <div
-              key={module.id}
-              onClick={() => handleModuleSelect(module)}
-              className={`p-3 sm:p-4 md:p-5 rounded-lg border cursor-pointer transition-all ${
-                selectedModule?.id === module.id
-                  ? 'border-blue-500 bg-blue-500/10'
-                  : 'border-zinc-700 hover:border-zinc-600 bg-zinc-800/50'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-white font-medium text-xs sm:text-sm md:text-base truncate">{module.name}</h4>
-                  <p className="text-xs sm:text-sm md:text-base text-zinc-400 mt-1">
-                    {module.questions?.length || 0} questions
-                  </p>
-                </div>
-                {selectedModule?.id === module.id && (
-                  <Check className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-blue-500 flex-shrink-0 ml-2" />
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      
-      {selectedModule && (
-        <Button
-          onClick={handleProceedWithModule}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm md:text-base py-2.5 sm:py-3 md:py-4"
-        >
-          Continue with "{selectedModule.name}"
-        </Button>
-      )}
-    </div>
-  );
-
-  const renderContactUpload = () => (
-    <div className="space-y-4 w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto">
-      <div className="text-center mb-4 sm:mb-6">
-        <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white mb-2">Upload Contacts</h3>
-        <p className="text-xs sm:text-sm md:text-base text-zinc-300">
-          Selected module: <span className="text-blue-400 break-words">{selectedModule?.name}</span>
-        </p>
-      </div>
-      
-      <div className="mb-4">
-        <Button
-          onClick={handleBackToModuleSelection}
-          variant="outline"
-          className="text-xs sm:text-sm md:text-base text-black border-zinc-600 hover:scale-105 px-3 py-1 sm:px-4 sm:py-2 md:px-5 md:py-3"
-        >
-          ← Back to Module Selection
-        </Button>
-      </div>
-      
-      <ContactUploader
-        selectedModule={selectedModule}
-        onSubmit={contacts => {
-          console.log("Submitted contacts:", contacts);
-          console.log("Selected module:", selectedModule);
-          setModalOpen(false);
-          setModalStep('module-selection');
-          setSelectedModule(null);
-        }}
-        onClose={handleModalClose}
-      />
-    </div>
-  );
 
   return (
     <>
@@ -205,7 +90,7 @@ const Hero: React.FC = () => {
             <span className="font-medium tracking-[-0.04em] drop-shadow-sm" style={{fontFamily: 'Sora, sans-serif'}}>.ai</span>
           </h1>
           <p className="text-xs sm:text-sm md:text-base mb-6 sm:mb-8 md:mb-10 max-w-2xl mx-auto font-light text-white/70 leading-relaxed px-4">
-            Automate voice calls, collect answers, and get instant insights.
+            Create questions, call customers, and let AI extract Yes/No/Maybe from conversations.
           </p>
           {/* Auth or Create Module Button */}
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-6 sm:mb-8 md:mb-10 px-4">
@@ -259,8 +144,9 @@ const Hero: React.FC = () => {
               {!user ? (
                 <>
                   <h2 className="text-sm sm:text-base md:text-lg font-semibold text-white mb-2 text-center">Get Started</h2>
-                  <p className="text-xs text-zinc-300 mb-4 sm:mb-6 text-center">Enter your details and we'll reach out soon.</p>
+                  <p className="text-xs text-zinc-300 mb-4 sm:mb-6 text-center">Upload your contacts to begin</p>
                   <ContactUploader
+                    userModules={userModules}
                     onSubmit={contacts => {
                       console.log("Submitted contacts:", contacts);
                       setModalOpen(false);
@@ -268,10 +154,22 @@ const Hero: React.FC = () => {
                     onClose={() => setModalOpen(false)}
                   />
                 </>
-              ) : modalStep === 'module-selection' ? (
-                renderModuleSelection()
               ) : (
-                renderContactUpload()
+                <>
+                  <h2 className="text-sm sm:text-base md:text-lg font-semibold text-white mb-2 text-center">Upload Contacts</h2>
+                  <p className="text-xs text-zinc-300 mb-4 sm:mb-6 text-center">Select a module and upload contacts to start calling</p>
+                  <ContactUploader
+                    userModules={userModules}
+                    selectedModule={selectedModule}
+                    onSubmit={contacts => {
+                      console.log("Submitted contacts:", contacts);
+                      console.log("Selected module:", selectedModule);
+                      setModalOpen(false);
+                      setSelectedModule(null);
+                    }}
+                    onClose={handleModalClose}
+                  />
+                </>
               )}
             </div>
           </Modal>

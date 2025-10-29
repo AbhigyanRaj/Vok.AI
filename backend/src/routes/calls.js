@@ -10,12 +10,13 @@ import {
   generateAndSaveAudioWithFallback,
   VOICES 
 } from '../config/elevenlabs.js';
+import { getOrGenerateAudio } from '../services/audioCache.js';
 import twilio from 'twilio';
 import User from '../models/User.js';
 import Module from '../models/Module.js';
 import Call from '../models/Call.js';
 import { protect } from '../middleware/auth.js';
-import path from 'path'; // Added for serving audio files
+import path from 'path';
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,8 +73,8 @@ function hasPublicUrl() {
   return baseUrl && !baseUrl.includes('localhost') && !baseUrl.includes('127.0.0.1');
 }
 
-// Smart hybrid audio generation function
-async function generateSmartAudio(text, audioType, callId, twimlResponse, selectedVoice = 'RACHEL') {
+// Smart hybrid audio generation function with 3-tier caching
+async function generateSmartAudio(text, audioType, callId, twimlResponse, selectedVoice = 'RACHEL', moduleId = null) {
   console.log(`🎤 Smart audio generation for: ${audioType} with voice: ${selectedVoice}`);
   
   // Check if we have a public URL for serving audio files
@@ -86,48 +87,40 @@ async function generateSmartAudio(text, audioType, callId, twimlResponse, select
     return;
   }
   
-  // Check if we should use ElevenLabs
-  if (shouldUseElevenLabs(audioType, callId)) {
-    try {
-      console.log(`🎤 Attempting ElevenLabs for ${audioType} with voice ${selectedVoice}...`);
-      const audio = await generateAndSaveAudioWithFallback(
-        text, 
-        selectedVoice, 
-        audioType
-      );
+  try {
+    // Use 3-tier caching system (Local → MongoDB → ElevenLabs API)
+    console.log(`🔍 Looking up cached audio for ${audioType}...`);
+    const result = await getOrGenerateAudio(text, selectedVoice, {
+      category: audioType,
+      isShared: audioType === 'greeting' || audioType === 'outro',
+      moduleId: moduleId
+    });
+    
+    if (result.success) {
+      console.log(`✅ Audio ready from ${result.source}: ${result.audioUrl}`);
       
-      if (audio.fallback) {
-        console.log(`⚠️ ElevenLabs failed for ${audioType}, using Twilio TTS`);
+      // Verify the URL is publicly accessible
+      if (result.audioUrl.includes('localhost') || result.audioUrl.includes('127.0.0.1')) {
+        console.log(`⚠️ Audio URL is localhost - falling back to Twilio TTS`);
         twimlResponse.say(text, { 
           voice: HYBRID_CONFIG.TWILIO_VOICE,
           language: HYBRID_CONFIG.TWILIO_LANGUAGE
         });
       } else {
-        console.log(`✅ ElevenLabs successful for ${audioType}`);
-        console.log(`🔗 Audio URL: ${audio.audioUrl}`);
-        
-        // Verify the URL is publicly accessible
-        if (audio.audioUrl.includes('localhost') || audio.audioUrl.includes('127.0.0.1')) {
-          console.log(`⚠️ Audio URL is localhost - falling back to Twilio TTS`);
-          twimlResponse.say(text, { 
-            voice: HYBRID_CONFIG.TWILIO_VOICE,
-            language: HYBRID_CONFIG.TWILIO_LANGUAGE
-          });
-        } else {
-          twimlResponse.play(audio.audioUrl);
+        twimlResponse.play(result.audioUrl);
+        if (result.apiCallMade) {
           recordElevenLabsUsage(callId);
+          console.log(`⚠️ API call made for ${audioType} - audio was not pre-generated`);
+        } else {
+          console.log(`✅ Using pre-generated audio (0 API calls)`);
         }
       }
-    } catch (error) {
-      console.log(`❌ ElevenLabs failed for ${audioType}, using Twilio TTS fallback`);
-      twimlResponse.say(text, { 
-        voice: HYBRID_CONFIG.TWILIO_VOICE,
-        language: HYBRID_CONFIG.TWILIO_LANGUAGE
-      });
+    } else {
+      throw new Error('Audio generation failed');
     }
-  } else {
-    // Use Twilio TTS directly
-    console.log(`🎤 Using Twilio TTS for ${audioType}`);
+  } catch (error) {
+    console.log(`❌ Audio generation failed for ${audioType}, using Twilio TTS fallback`);
+    console.error('Error:', error.message);
     twimlResponse.say(text, { 
       voice: HYBRID_CONFIG.TWILIO_VOICE,
       language: HYBRID_CONFIG.TWILIO_LANGUAGE
@@ -317,8 +310,12 @@ router.post('/initiate', protect, async (req, res) => {
           statusCallbackMethod: 'POST',
           // Add timeout to prevent hanging calls
           timeout: 120, // 2 minutes max call duration
-          // Add recording for debugging
-          record: false,
+          // Enable recording with transcription
+          record: true,
+          recordingStatusCallback: `${publicUrl}/api/calls/recording-status`,
+          recordingStatusCallbackMethod: 'POST',
+          recordingChannels: 'mono',
+          trim: 'trim-silence',
           // Add machine detection with valid parameters only
           machineDetection: 'DetectMessageEnd',
           machineDetectionTimeout: 30
@@ -367,7 +364,8 @@ router.post('/initiate', protect, async (req, res) => {
           'greeting',
           callId,
           twiml,
-          selectedVoice
+          selectedVoice,
+          moduleId
         );
         
         twiml.pause({ length: 1 });
@@ -379,11 +377,12 @@ router.post('/initiate', protect, async (req, res) => {
             const audioType = index === 0 ? 'first_question' : 'key_questions';
             
             await generateSmartAudio(
-              `Question ${index + 1}: ${question.question}`,
-              audioType,
+              question.question,
+              'question',
               callId,
               twiml,
-              selectedVoice
+              selectedVoice,
+              moduleId
             );
             
             twiml.pause({ length: 3 }); // Give time for response
@@ -395,7 +394,8 @@ router.post('/initiate', protect, async (req, res) => {
             'outro',
             callId,
             twiml,
-            selectedVoice
+            selectedVoice,
+            moduleId
           );
         } else {
           // Use Twilio TTS for simple message
@@ -417,7 +417,13 @@ router.post('/initiate', protect, async (req, res) => {
           statusCallback: statusCallbackUrl.toString(),
           statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed', 'failed', 'busy', 'no-answer', 'canceled'],
           statusCallbackMethod: 'POST',
-          timeout: 120
+          timeout: 120,
+          // Enable recording with transcription
+          record: true,
+          recordingStatusCallback: `${process.env.BASE_URL}/api/calls/recording-status`,
+          recordingStatusCallbackMethod: 'POST',
+          recordingChannels: 'mono',
+          trim: 'trim-silence'
         });
       } catch (twilioError) {
         console.error('❌ Twilio call creation error:', twilioError);
@@ -590,7 +596,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         'greeting',
         callId,
         twimlResponse,
-        selectedVoice
+        selectedVoice,
+        moduleId
       );
 
       const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
@@ -631,7 +638,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           'confirmation',
           callId,
           twimlResponse,
-          selectedVoice
+          selectedVoice,
+          moduleId
         );
         
         twimlResponse.pause({ length: 0.5 });
@@ -658,10 +666,11 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         // Use smart hybrid for the first question (HIGH PRIORITY)
         await generateSmartAudio(
           questions[0].question,
-          'first_question',
+          'question',
           callId,
           gather,
-          selectedVoice
+          selectedVoice,
+          moduleId
         );
 
       } else {
@@ -674,7 +683,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           'decline',
           callId,
           twimlResponse,
-          selectedVoice
+          selectedVoice,
+          moduleId
         );
         
         twimlResponse.hangup();
@@ -738,7 +748,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           'outro',
           callId,
           twimlResponse,
-          selectedVoice
+          selectedVoice,
+          moduleId
         );
         
         twimlResponse.pause({ length: 1 });
@@ -749,7 +760,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           'final',
           callId,
           twimlResponse,
-          selectedVoice
+          selectedVoice,
+          moduleId
         );
         
         twimlResponse.hangup();
@@ -783,13 +795,13 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         });
         
         // Use smart hybrid for the question
-        const audioType = questionIndex === 0 ? 'first_question' : 'key_questions';
         await generateSmartAudio(
           questions[questionIndex].question,
-          audioType,
+          'question',
           callId,
           gather,
-          selectedVoice
+          selectedVoice,
+          moduleId
         );
         
         console.log(`Asked question ${questionIndex}: ${questions[questionIndex].question}`);
@@ -1703,6 +1715,51 @@ router.post('/test-status', (req, res) => {
       success: false,
       error: error.message
     });
+  }
+});
+
+// Recording status webhook - handles recording completion and transcription
+router.post('/recording-status', validateTwilioRequest, async (req, res) => {
+  try {
+    const { 
+      CallSid, 
+      RecordingUrl, 
+      RecordingSid,
+      RecordingStatus,
+      RecordingDuration 
+    } = req.body;
+    
+    console.log('\n=== Recording Status Update ===');
+    console.log('Call SID:', CallSid);
+    console.log('Recording SID:', RecordingSid);
+    console.log('Recording Status:', RecordingStatus);
+    console.log('Recording URL:', RecordingUrl);
+    console.log('Duration:', RecordingDuration);
+
+    // Find the call record
+    const call = await Call.findOne({ twilioCallSid: CallSid });
+    
+    if (call && RecordingStatus === 'completed') {
+      // Save recording URL
+      call.recordingUrl = RecordingUrl;
+      
+      // Add .json to get the recording metadata which includes transcription if available
+      const recordingMetadataUrl = `${RecordingUrl}.json`;
+      
+      console.log('✅ Recording completed and saved');
+      console.log('Recording URL:', RecordingUrl);
+      
+      // Note: Twilio's automatic transcription is a paid add-on
+      // For now, we'll just save the recording URL
+      // The transcription from speech responses during the call is already captured
+      
+      await call.save();
+    }
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Recording status webhook error:', error);
+    res.sendStatus(200); // Still return 200 to Twilio
   }
 });
 

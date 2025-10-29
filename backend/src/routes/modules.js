@@ -3,6 +3,7 @@ import Module from '../models/Module.js';
 import Call from '../models/Call.js';
 import { protect } from '../middleware/auth.js';
 import { generateLoanQuestions, generateCreditCardQuestions } from '../config/openai.js';
+import { preGenerateModuleAudio } from '../services/audioCache.js';
 
 const router = express.Router();
 
@@ -11,7 +12,10 @@ router.get('/', protect, async (req, res) => {
   try {
     const { type, active } = req.query;
     
-    let query = { userId: req.user._id };
+    let query = { 
+      userId: req.user._id,
+      isDeleted: false // Exclude soft-deleted modules
+    };
     
     // Filter by type if provided
     if (type && ['loan', 'credit_card', 'custom'].includes(type)) {
@@ -144,6 +148,23 @@ router.post('/', protect, async (req, res) => {
       questions: moduleQuestions,
     });
 
+    // Pre-generate audio for Pro/Enterprise users only
+    // This prevents API abuse for free users
+    const userSubscription = req.user.subscription?.tier || 'free';
+    
+    if (userSubscription === 'pro' || userSubscription === 'enterprise') {
+      console.log(`🎤 Pre-generating audio for ${userSubscription} user's module...`);
+      try {
+        await preGenerateModuleAudio(module, 'RACHEL');
+        console.log('✅ Audio pre-generation complete');
+      } catch (error) {
+        console.warn('⚠️ Audio pre-generation failed:', error.message);
+        console.warn('   Module created successfully, audio will be generated on-demand');
+      }
+    } else {
+      console.log('ℹ️ Free user - audio will be generated on-demand with Twilio TTS');
+    }
+
     res.status(201).json({
       success: true,
       message: 'Module created successfully',
@@ -216,7 +237,7 @@ router.put('/:id', protect, async (req, res) => {
   }
 });
 
-// Delete module
+// Delete module (soft delete)
 router.delete('/:id', protect, async (req, res) => {
   try {
     const moduleId = req.params.id;
@@ -229,18 +250,8 @@ router.delete('/:id', protect, async (req, res) => {
       });
     }
 
-    // Check if module has any associated calls
-    const callCount = await Call.countDocuments({ moduleId: moduleId });
-    console.log(`Module ${moduleId} has ${callCount} associated calls`);
-    
-    if (callCount > 0) {
-      return res.status(400).json({ 
-        error: 'Cannot delete module with associated calls',
-        message: `This module has ${callCount} associated calls. Please delete calls first or archive the module instead.`
-      });
-    }
-
-    const module = await Module.findOneAndDelete({
+    // Find the module
+    const module = await Module.findOne({
       _id: moduleId,
       userId: req.user._id,
     });
@@ -250,7 +261,13 @@ router.delete('/:id', protect, async (req, res) => {
       return res.status(404).json({ error: 'Module not found' });
     }
 
-    console.log(`Module ${moduleId} deleted successfully`);
+    // Soft delete - mark as deleted instead of removing
+    module.isDeleted = true;
+    module.deletedAt = new Date();
+    module.isActive = false;
+    await module.save();
+
+    console.log(`Module ${moduleId} soft deleted successfully`);
     res.json({
       success: true,
       message: 'Module deleted successfully',

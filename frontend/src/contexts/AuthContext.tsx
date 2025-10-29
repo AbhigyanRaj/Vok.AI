@@ -7,6 +7,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  setUser: (user: auth.User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -65,7 +66,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signIn = async () => {
     try {
-      await googleLogin();
+      googleLogin();
     } catch (error) {
       console.error('Sign in error:', error);
       throw error;
@@ -87,6 +88,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loading,
     signIn,
     signOut,
+    setUser,
   };
 
   return (

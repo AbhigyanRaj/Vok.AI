@@ -4,10 +4,11 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export const transcribeAudio = async (audioBuffer) => {
   try {
-    // Note: Gemini doesn't have built-in audio transcription
-    // For now, we'll return a placeholder or use a different service
-    console.log('Audio transcription requested - using placeholder');
-    return "Audio transcription placeholder - integrate with Google Speech-to-Text API if needed";
+    // Note: Actual transcription happens during the call via Twilio's speech recognition
+    // The transcription is built from the SpeechResult responses collected during the call
+    // This function is kept for compatibility but transcription is handled in real-time
+    console.log('Audio transcription - handled via real-time speech recognition during call');
+    return "Transcription is captured in real-time during the call via Twilio speech recognition";
   } catch (error) {
     console.error('Transcription error:', error);
     throw error;
