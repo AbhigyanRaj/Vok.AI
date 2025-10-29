@@ -3,15 +3,6 @@ import { validateTwilioRequest } from '../config/twilio.js';
 import { createTwiMLResponse, addMediaStream } from '../utils/twimlHelpers.js';
 import { analyzeResponseWithGemini, evaluateApplication, generateSummary } from '../config/openai.js';
 import { formatPhoneNumber, validatePhoneNumber } from '../utils/phoneUtils.js';
-import { 
-  testElevenLabsConnection, 
-  getVoiceInfo, 
-  sayWithElevenLabs, 
-  generateAndSaveAudio,
-  generateAndSaveAudioWithFallback,
-  VOICES 
-} from '../config/elevenlabs.js';
-import { getOrGenerateAudio } from '../services/audioCache.js';
 import twilio from 'twilio';
 import User from '../models/User.js';
 import Module from '../models/Module.js';
@@ -127,9 +118,9 @@ function hasPublicUrl() {
   return baseUrl && !baseUrl.includes('localhost') && !baseUrl.includes('127.0.0.1');
 }
 
-// Simple Twilio TTS function - No ElevenLabs
-async function generateSimpleTTS(text, audioType, twimlResponse) {
-  console.log(`\n🎤 [${audioType.toUpperCase()}] ASKING: "${text}"`);
+// Simple Twilio TTS function (replaces ElevenLabs)
+async function generateSmartAudio(text, audioType, callId, twimlResponse, selectedVoice = 'RACHEL', moduleId = null) {
+  console.log(`🎤 [${audioType.toUpperCase()}] AI SAYS: "${text}"`);
   twimlResponse.say(text, { 
     voice: HYBRID_CONFIG.TWILIO_VOICE,
     language: HYBRID_CONFIG.TWILIO_LANGUAGE
@@ -366,11 +357,14 @@ router.post('/initiate', protect, async (req, res) => {
         // Generate unique call ID for tracking
         const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
-        // Use simple TTS for greeting
-        await generateSimpleTTS(
+        // Use smart hybrid for greeting (HIGH PRIORITY)
+        await generateSmartAudio(
           `Hello ${customerName}, this is a call from Vok.AI. We have a few questions for you.`,
           'greeting',
-          twiml
+          callId,
+          twiml,
+          selectedVoice,
+          moduleId
         );
         
         twiml.pause({ length: 1 });
@@ -381,20 +375,26 @@ router.post('/initiate', protect, async (req, res) => {
             // Determine audio type based on question importance
             const audioType = index === 0 ? 'first_question' : 'key_questions';
             
-            await generateSimpleTTS(
+            await generateSmartAudio(
               question.question,
-              `question_${index + 1}`,
-              twiml
+              'question',
+              callId,
+              twiml,
+              selectedVoice,
+              moduleId
             );
             
             twiml.pause({ length: 3 }); // Give time for response
           }
           
-          // Use simple TTS for outro
-          await generateSimpleTTS(
+          // Use smart hybrid for outro (HIGH PRIORITY)
+          await generateSmartAudio(
             'Thank you for answering all our questions. Have a great day!',
             'outro',
-            twiml
+            callId,
+            twiml,
+            selectedVoice,
+            moduleId
           );
         } else {
           // Use Twilio TTS for simple message
@@ -552,20 +552,32 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
     console.log('Request Body:', req.body);
     console.log('Request Query:', req.query);
     
-    // Enhanced user input logging
+    // Enhanced user input logging with question context
     if (previousResponse) {
-        console.log('\n' + '='.repeat(80));
-        console.log('💬 [LIVE CALL] CUSTOMER RESPONSE:');
-        console.log('   Question #' + (step - 1) + ': ' + questions[questionIndex - 1]?.question);
-        console.log('   👤 Customer said: "' + previousResponse + '"');
-        console.log('   🤖 AI Analysis: ' + analysisResult);
-        console.log('='.repeat(80) + '\n');
+      console.log('\n' + '='.repeat(80));
+      console.log('💬 LIVE CONVERSATION');
+      console.log('='.repeat(80));
+      
+      // Show what question was asked
+      if (step > 0) {
+        const module = await Module.findById(moduleId);
+        if (module && module.questions && module.questions[step - 1]) {
+          const previousQuestion = module.questions.find(q => q.order === step - 1);
+          if (previousQuestion) {
+            console.log(`❓ QUESTION ${step}: "${previousQuestion.question}"`);
+          }
+        }
+      }
+      
+      console.log(`💬 USER RESPONSE: "${previousResponse}"`);
+      console.log('📊 Confidence:', req.body.Confidence || 'N/A');
+      console.log('🔍 Analysis:', previousResponse.toLowerCase().includes('yes') ? '✅ POSITIVE' : previousResponse.toLowerCase().includes('no') ? '❌ NEGATIVE' : '⚠️ NEUTRAL');
+      console.log('='.repeat(80) + '\n');
     }
 
     // Get module and its questions
     const module = await Module.findById(moduleId);
     if (!module) {
-// ...
       const errorResponse = createTwiMLResponse();
       errorResponse.say('Sorry, there was an error. Please try again later.', { 
         voice: 'Polly.Aditi',
@@ -602,6 +614,16 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         console.log('🎤 Streaming enabled for real-time transcription');
       }
       
+      // Use smart hybrid for greeting (HIGH PRIORITY)
+      await generateSmartAudio(
+        `Hello ${customerName}, this is an automated call from Vok AI. We have a few important questions that will only take 2-3 minutes of your time. Is now a good time to speak with you?`,
+        'greeting',
+        callId,
+        twimlResponse,
+        selectedVoice,
+        moduleId
+      );
+
       const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
       nextUrl.searchParams.set('moduleId', moduleId);
       nextUrl.searchParams.set('customerName', customerName);
@@ -624,13 +646,6 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         hints: 'yes,no,okay,sure,go ahead,yeah,hmm,uh huh,alright,fine,good,great,interested,not interested,maybe,definitely,absolutely,never,sounds good'
       });
 
-      // Use simple TTS for greeting
-      await generateSimpleTTS(
-        `Hello ${customerName}, this is an automated call from Vok AI. We have a few important questions that will only take 2-3 minutes of your time. Is now a good time to speak with you?`,
-        'greeting',
-        gather
-      );
-
     } else if (step === 1) {
       // Check if customer confirmed availability
       const callId = req.query.callId || req.body.callId || `webhook_${Date.now()}`;
@@ -649,11 +664,14 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           console.log('\n✅ CUSTOMER CONFIRMED AVAILABILITY!');
           console.log('🎯 Moving to questions...');
           
-          // Use simple TTS for confirmation
-          await generateSimpleTTS(
+          // Use smart hybrid for confirmation
+          await generateSmartAudio(
             'Perfect! Thank you for your time. I will now ask you a few quick questions. Please speak clearly after each question, and I will wait for your response.',
             'confirmation',
-            twimlResponse
+            callId,
+            twimlResponse,
+            selectedVoice,
+            moduleId
           );
           
           twimlResponse.pause({ length: 0.1 });
@@ -678,22 +696,28 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
             hints: 'yes,no,okay,sure,interested,not interested,maybe,definitely,absolutely,never,sounds good,great,fine,alright'
           });
           
-          // Use simple TTS for the first question
-          await generateSimpleTTS(
+          // Use smart hybrid for the first question (HIGH PRIORITY)
+          await generateSmartAudio(
             questions[0].question,
-            'question_1',
-            gather
+            'question',
+            callId,
+            gather,
+            selectedVoice,
+            moduleId
           );
 
         } else {
           console.log('\n❌ CUSTOMER DECLINED');
           console.log('📞 Ending call gracefully...');
           
-          // Use simple TTS for decline message
-          await generateSimpleTTS(
+          // Use smart hybrid for decline message
+          await generateSmartAudio(
             "I completely understand. Thank you for your time today. We'll reach out at a more convenient time. Have a wonderful day!",
             'decline',
-            twimlResponse
+            callId,
+            twimlResponse,
+            selectedVoice,
+            moduleId
           );
           
           twimlResponse.hangup();
@@ -719,11 +743,14 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         console.log('\n⚠️ NO RESPONSE FROM CUSTOMER');
         console.log('📞 Handling gracefully...');
         
-        // Use simple TTS for no response message
-        await generateSimpleTTS(
+        // Use smart hybrid for no response message
+        await generateSmartAudio(
           "It looks like this might not be the right time to call. No worries at all! We'll reach out to you again at a more convenient time. Thank you and have a great day!",
           'no_response',
-          twimlResponse
+          callId,
+          twimlResponse,
+          selectedVoice,
+          moduleId
         );
         
         twimlResponse.hangup();
@@ -821,20 +848,26 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           thankYouMessage = `Thank you so much for taking the time to answer all our questions. Your honest feedback is very valuable to us, and we appreciate your time.`;
         }
         
-        // Use simple TTS for personalized outro
-        await generateSimpleTTS(
+        // Use smart hybrid for personalized outro (HIGH PRIORITY)
+        await generateSmartAudio(
           thankYouMessage,
           'outro',
-          twimlResponse
+          callId,
+          twimlResponse,
+          selectedVoice,
+          moduleId
         );
         
         twimlResponse.pause({ length: 0.2 });
         
-        // Use simple TTS for final message
-        await generateSimpleTTS(
+        // Use smart hybrid for final message
+        await generateSmartAudio(
           'Our team will carefully review your responses. Thank you for choosing Vok AI, and have a wonderful day!',
           'final',
-          twimlResponse
+          callId,
+          twimlResponse,
+          selectedVoice,
+          moduleId
         );
         
         twimlResponse.hangup();
@@ -877,11 +910,14 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           hints: 'yes,no,okay,sure,interested,not interested,maybe,definitely,absolutely,never,sounds good,great,fine,alright'
         });
         
-        // Use simple TTS for the question
-        await generateSimpleTTS(
+        // Use smart hybrid for the question
+        await generateSmartAudio(
           questions[questionIndex].question,
-          `question_${step}`,
-          gather
+          'question',
+          callId,
+          gather,
+          selectedVoice,
+          moduleId
         );
         
         console.log(`Asked question ${questionIndex}: ${questions[questionIndex].question}`);
