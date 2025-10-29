@@ -1,8 +1,8 @@
 import twilio from 'twilio';
+const { validateRequest } = twilio;
 
 // Lazy initialization of Twilio client
 let client = null;
-let requestValidator = null;
 
 const getTwilioClient = () => {
   if (!client) {
@@ -23,8 +23,7 @@ const getTwilioClient = () => {
     
     try {
       client = twilio(accountSid, authToken);
-      requestValidator = new twilio.RequestValidator(authToken);
-      console.log('✅ Twilio client and validator initialized successfully');
+      console.log('✅ Twilio client initialized successfully');
     } catch (error) {
       console.error('❌ Error creating Twilio client:', error);
       throw error;
@@ -33,17 +32,7 @@ const getTwilioClient = () => {
   return client;
 };
 
-const getRequestValidator = () => {
-  if (!requestValidator) {
-    try {
-      getTwilioClient(); // This will initialize both
-    } catch (error) {
-      console.error('Error initializing Twilio client:', error);
-      return null;
-    }
-  }
-  return requestValidator;
-};
+// Removed - using validateRequest function directly instead
 
 /**
  * Validate Twilio webhook request
@@ -96,16 +85,15 @@ export const validateTwilioRequest = (req, res, next) => {
       return next();
     }
     
-    // Validate the request
-    const validator = getRequestValidator();
+    // Validate the request using Twilio's validateRequest function
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
     
-    // Check if validator is available
-    if (!validator) {
-      console.log('WARNING: Twilio validator not available, skipping validation');
+    if (!authToken) {
+      console.log('WARNING: Auth token not available, skipping validation');
       return next();
     }
     
-    const isValid = validator.validate(url, postData, twilioSignature);
+    const isValid = validateRequest(authToken, twilioSignature, url, postData);
     
     console.log('Request validation result:', isValid ? 'Valid' : 'Invalid');
     
