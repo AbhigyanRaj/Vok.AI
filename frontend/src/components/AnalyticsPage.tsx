@@ -12,7 +12,8 @@ import {
   Trash2,
   AlertTriangle,
   X,
-  Activity
+  Activity,
+  PhoneOutgoing
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import * as auth from "../lib/auth";
@@ -91,6 +92,7 @@ const AnalyticsPage: React.FC = () => {
   const [deletingCall, setDeletingCall] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [selectedModuleFilter, setSelectedModuleFilter] = useState<string>('all');
+  const [retryingCall, setRetryingCall] = useState<string | null>(null);
 
   const fetchAnalyticsData = async () => {
     if (!user) return;
@@ -380,6 +382,48 @@ const AnalyticsPage: React.FC = () => {
 
   const deselectAllCalls = () => {
     setSelectedCalls([]);
+  };
+
+  const retryCall = async (call: CallData) => {
+    if (!call.module?._id) {
+      setError('Module information not available for this call');
+      return;
+    }
+
+    try {
+      setRetryingCall(call._id);
+      const token = auth.getStoredToken();
+      
+      const response = await fetch(`${process.env.NODE_ENV === 'production' 
+        ? 'https://vok-ai.onrender.com/api'
+        : 'http://localhost:5001/api'}/calls/initiate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          moduleId: call.module._id,
+          customerName: call.customerName,
+          phoneNumber: call.phoneNumber,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Refresh analytics to show the new call
+        await fetchAnalyticsData();
+        setError('');
+      } else {
+        setError(data.error || 'Failed to retry call');
+      }
+    } catch (error) {
+      console.error('Error retrying call:', error);
+      setError('Failed to retry call');
+    } finally {
+      setRetryingCall(null);
+    }
   };
 
 
@@ -918,19 +962,35 @@ const AnalyticsPage: React.FC = () => {
                             </div>
                           </td>
                           <td className="py-4 px-4">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => deleteCall(call._id)}
-                              disabled={deletingCall === call._id}
-                              className="text-xs sm:text-sm px-3 py-2 text-red-400 border-red-500/30 hover:bg-red-500/10"
-                            >
-                              {deletingCall === call._id ? (
-                                <RefreshCw className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-3 h-3" />
-                              )}
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => retryCall(call)}
+                                disabled={retryingCall === call._id || !call.module?._id}
+                                className="text-xs sm:text-sm px-3 py-2 text-blue-400 border-blue-500/30 hover:bg-blue-500/10"
+                                title="Retry call with same details"
+                              >
+                                {retryingCall === call._id ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <PhoneOutgoing className="w-3 h-3" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => deleteCall(call._id)}
+                                disabled={deletingCall === call._id}
+                                className="text-xs sm:text-sm px-3 py-2 text-red-400 border-red-500/30 hover:bg-red-500/10"
+                              >
+                                {deletingCall === call._id ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3 h-3" />
+                                )}
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))}
