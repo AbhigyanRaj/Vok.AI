@@ -1143,6 +1143,8 @@ async function processCallCompletion(call, phoneNumber) {
       comments.push('Application meets all eligibility criteria');
     } else if (evaluation === 'NO') {
       comments.push('Application does not meet minimum eligibility requirements');
+    } else if (evaluation === 'MAYBE') {
+      comments.push('Customer showed interest but needs more information');
     } else {
       comments.push('Further verification and documentation required');
     }

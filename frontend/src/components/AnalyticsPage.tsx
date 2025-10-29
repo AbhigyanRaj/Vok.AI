@@ -379,20 +379,22 @@ const AnalyticsPage: React.FC = () => {
   };
 
 
-  const getResultColor = (result: 'YES' | 'NO' | 'MAYBE') => {
+  const getResultColor = (result: 'YES' | 'NO' | 'MAYBE' | 'INVESTIGATION_REQUIRED') => {
     switch (result) {
       case 'YES': return 'bg-green-500/20 text-green-400 border-green-500/30';
       case 'NO': return 'bg-red-500/20 text-red-400 border-red-500/30';
       case 'MAYBE': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      case 'INVESTIGATION_REQUIRED': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     }
   };
 
-  const getResultIcon = (result: 'YES' | 'NO' | 'MAYBE') => {
+  const getResultIcon = (result: 'YES' | 'NO' | 'MAYBE' | 'INVESTIGATION_REQUIRED') => {
     switch (result) {
       case 'YES': return <CheckCircle className="w-4 h-4" />;
       case 'NO': return <XCircle className="w-4 h-4" />;
       case 'MAYBE': return <AlertTriangle className="w-4 h-4" />;
+      case 'INVESTIGATION_REQUIRED': return <Activity className="w-4 h-4" />;
       default: return <Activity className="w-4 h-4" />;
     }
   };

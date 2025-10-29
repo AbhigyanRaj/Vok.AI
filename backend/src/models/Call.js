@@ -49,7 +49,7 @@ const callSchema = new mongoose.Schema({
   evaluation: {
     result: {
       type: String,
-      enum: ['YES', 'NO', 'INVESTIGATION_REQUIRED'],
+      enum: ['YES', 'NO', 'MAYBE', 'INVESTIGATION_REQUIRED'],
       default: null,
     },
     comments: [{
