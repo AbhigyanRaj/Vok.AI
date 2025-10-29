@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { LogOut, Menu, User, X, Layers, BarChart3, Settings, Crown } from "lucide-react";
+import { LogOut, Menu, User, X, Layers, BarChart3, Settings, Crown, PlayCircle } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import Modal from "./ui/modal";
 import { Button } from "./ui/button";
@@ -76,10 +76,21 @@ const Navbar: React.FC = () => {
               </div>
             )}
 
-            {/* Div 3: User Elements (Plan Badge, User Info) - Desktop Only */}
+            {/* Div 3: User Elements (Demo, Plan Badge, User Info) - Desktop Only */}
             <div className="hidden lg:flex items-center space-x-3">
               {user ? (
                 <>
+                  {/* Minimal Demo Button */}
+                  <a
+                    href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800/50 transition-colors"
+                    title="Watch demo"
+                  >
+                    <PlayCircle className="w-3.5 h-3.5 text-zinc-400" />
+                    Demo
+                  </a>
                   {/* Plan Badge */}
                   <Link
                     to="/buy-token"
@@ -163,6 +174,17 @@ const Navbar: React.FC = () => {
                       {item.name}
                     </Link>
                   ))}
+                  {/* Mobile Demo Link */}
+                  <a
+                    href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors text-zinc-300 hover:text-white hover:bg-zinc-800"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <PlayCircle className="w-4 h-4 text-zinc-400" />
+                    Demo
+                  </a>
                 </div>
                 
                 {/* Mobile Plan Badge */}

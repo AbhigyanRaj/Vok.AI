@@ -1,7 +1,7 @@
 import express from 'express';
 import { validateTwilioRequest } from '../config/twilio.js';
 import { createTwiMLResponse, addMediaStream } from '../utils/twimlHelpers.js';
-import { analyzeResponseWithGemini } from '../config/openai.js';
+import { analyzeResponseWithGemini, evaluateApplication, generateSummary } from '../config/openai.js';
 import { formatPhoneNumber, validatePhoneNumber } from '../utils/phoneUtils.js';
 import { 
   testElevenLabsConnection, 
