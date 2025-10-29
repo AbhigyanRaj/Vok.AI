@@ -146,4 +146,19 @@ export const evaluateApplication = async (applicationType, applicationData) => {
   }
 };
 
+/**
+ * Analyze customer response using Gemini AI
+ */
+export const analyzeResponseWithGemini = async (prompt) => {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text().trim();
+  } catch (error) {
+    console.error('Gemini analysis error:', error);
+    throw error;
+  }
+};
+
 export default genAI; 

@@ -1,6 +1,7 @@
 import express from 'express';
-import { makeCall, createTwiMLResponse, validateTwilioRequest } from '../config/twilio.js';
-import { transcribeAudio, generateSummary, evaluateApplication } from '../config/openai.js';
+import { validateTwilioRequest } from '../config/twilio.js';
+import { createTwiMLResponse } from '../utils/twimlHelpers.js';
+import { analyzeResponseWithGemini } from '../config/openai.js';
 import { formatPhoneNumber, validatePhoneNumber } from '../utils/phoneUtils.js';
 import { 
   testElevenLabsConnection, 
@@ -22,6 +23,59 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+
+// AI Response Analysis Function
+async function analyzeCustomerResponse(response, question) {
+  try {
+    console.log('🤖 Analyzing customer response:', response);
+    
+    // Use Gemini to analyze the response
+    const analysisPrompt = `
+    Analyze this customer response to determine if they are saying YES, NO, or MAYBE/UNCERTAIN.
+    
+    Question asked: "${question}"
+    Customer response: "${response}"
+    
+    Rules:
+    - Return only "YES" if the response is clearly positive/affirmative
+    - Return only "NO" if the response is clearly negative/declining
+    - Return only "MAYBE" if the response is uncertain, unclear, or needs follow-up
+    
+    Consider variations like:
+    - YES: "yes", "yeah", "sure", "okay", "definitely", "absolutely", "of course", "I am interested"
+    - NO: "no", "nah", "not interested", "not now", "I don't want", "not for me"
+    - MAYBE: "maybe", "I'm not sure", "let me think", "possibly", "depends", unclear responses
+    
+    Response (only YES, NO, or MAYBE):`;
+
+    const result = await analyzeResponseWithGemini(analysisPrompt);
+    
+    // Ensure we return a valid result
+    if (result && ['YES', 'NO', 'MAYBE'].includes(result.toUpperCase())) {
+      return result.toUpperCase();
+    }
+    
+    // Fallback analysis using simple keyword matching
+    const responseText = response.toLowerCase();
+    
+    // Positive indicators
+    if (['yes', 'yeah', 'yep', 'sure', 'okay', 'ok', 'definitely', 'absolutely', 'of course', 'interested', 'good', 'great'].some(word => responseText.includes(word))) {
+      return 'YES';
+    }
+    
+    // Negative indicators
+    if (['no', 'nah', 'not interested', 'not now', 'don\'t want', 'not for me', 'never', 'refuse'].some(phrase => responseText.includes(phrase))) {
+      return 'NO';
+    }
+    
+    // Default to MAYBE for uncertain responses
+    return 'MAYBE';
+    
+  } catch (error) {
+    console.error('Error analyzing response:', error);
+    return 'MAYBE'; // Default to MAYBE on error
+  }
+}
 
 // Configuration - Smart Hybrid System
 const HYBRID_CONFIG = {
@@ -626,61 +680,96 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       // Check if customer confirmed availability
       const callId = req.query.callId || req.body.callId || `webhook_${Date.now()}`;
       
-      if (previousResponse && ['yes', 'okay', 'sure', 'go ahead', 'yeah', 'hmm', 'uh huh'].some(word => 
-        previousResponse.toLowerCase().includes(word))) {
-        
-        console.log('\n✅ CUSTOMER CONFIRMED AVAILABILITY!');
-        console.log('🎯 Moving to questions...');
-        
-        // Use smart hybrid for confirmation
-        await generateSmartAudio(
-          'Perfect! Thank you for your time. I will now ask you a few quick questions. Please speak clearly after each question, and I will wait for your response.',
-          'confirmation',
-          callId,
-          twimlResponse,
-          selectedVoice,
-          moduleId
-        );
-        
-        twimlResponse.pause({ length: 0.5 });
+      if (previousResponse && previousResponse.trim().length > 0) {
+        // Customer responded - check if positive
+        if (['yes', 'okay', 'sure', 'go ahead', 'yeah', 'hmm', 'uh huh', 'alright', 'fine', 'good', 'great'].some(word => 
+          previousResponse.toLowerCase().includes(word))) {
+          
+          console.log('\n✅ CUSTOMER CONFIRMED AVAILABILITY!');
+          console.log('🎯 Moving to questions...');
+          
+          // Use smart hybrid for confirmation
+          await generateSmartAudio(
+            'Perfect! Thank you for your time. I will now ask you a few quick questions. Please speak clearly after each question, and I will wait for your response.',
+            'confirmation',
+            callId,
+            twimlResponse,
+            selectedVoice,
+            moduleId
+          );
+          
+          twimlResponse.pause({ length: 0.5 });
 
-        const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
-        nextUrl.searchParams.set('moduleId', moduleId);
-        nextUrl.searchParams.set('customerName', customerName);
-        nextUrl.searchParams.set('step', '2');
-        nextUrl.searchParams.set('phoneNumber', phoneNumber);
-        nextUrl.searchParams.set('selectedVoice', selectedVoice);
-        nextUrl.searchParams.set('callId', callId);
+          const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
+          nextUrl.searchParams.set('moduleId', moduleId);
+          nextUrl.searchParams.set('customerName', customerName);
+          nextUrl.searchParams.set('step', '2');
+          nextUrl.searchParams.set('phoneNumber', phoneNumber);
+          nextUrl.searchParams.set('selectedVoice', selectedVoice);
+          nextUrl.searchParams.set('callId', callId);
 
-        const gather = twimlResponse.gather({
-          input: 'speech',
-          action: nextUrl.toString(),
-          timeout: 20,
-          method: 'POST',
-          speechTimeout: 'auto',
-          speechModel: 'experimental_conversations',
-          enhanced: true,
-          language: 'en-US'
-        });
-        
-        // Use smart hybrid for the first question (HIGH PRIORITY)
-        await generateSmartAudio(
-          questions[0].question,
-          'question',
-          callId,
-          gather,
-          selectedVoice,
-          moduleId
-        );
+          const gather = twimlResponse.gather({
+            input: 'speech',
+            action: nextUrl.toString(),
+            timeout: 20,
+            method: 'POST',
+            speechTimeout: 'auto',
+            speechModel: 'experimental_conversations',
+            enhanced: true,
+            language: 'en-US'
+          });
+          
+          // Use smart hybrid for the first question (HIGH PRIORITY)
+          await generateSmartAudio(
+            questions[0].question,
+            'question',
+            callId,
+            gather,
+            selectedVoice,
+            moduleId
+          );
 
+        } else {
+          console.log('\n❌ CUSTOMER DECLINED');
+          console.log('📞 Ending call gracefully...');
+          
+          // Use smart hybrid for decline message
+          await generateSmartAudio(
+            "I completely understand. Thank you for your time today. We'll reach out at a more convenient time. Have a wonderful day!",
+            'decline',
+            callId,
+            twimlResponse,
+            selectedVoice,
+            moduleId
+          );
+          
+          twimlResponse.hangup();
+
+          // Update call status
+          if (call) {
+            call.status = 'completed';
+            call.currentStep = step;
+            call.completedAt = new Date();
+            call.responses.set('decline_reason', 'customer_declined');
+            
+            // Calculate duration if not already set
+            if (!call.duration && call.createdAt) {
+              const durationMs = new Date() - new Date(call.createdAt);
+              call.duration = Math.floor(durationMs / 1000);
+            }
+            
+            await call.save();
+            console.log(`✅ Call declined with duration: ${call.duration} seconds`);
+          }
+        }
       } else {
-        console.log('\n❌ CUSTOMER DECLINED OR NO RESPONSE');
-        console.log('📞 Ending call...');
+        console.log('\n⚠️ NO RESPONSE FROM CUSTOMER');
+        console.log('📞 Handling gracefully...');
         
-        // Use smart hybrid for decline message
+        // Use smart hybrid for no response message
         await generateSmartAudio(
-          "I completely understand. Thank you for your time today. We'll reach out at a more convenient time. Have a wonderful day!",
-          'decline',
+          "It looks like this might not be the right time to call. No worries at all! We'll reach out to you again at a more convenient time. Thank you and have a great day!",
+          'no_response',
           callId,
           twimlResponse,
           selectedVoice,
@@ -691,9 +780,19 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
 
         // Update call status
         if (call) {
-          call.status = 'completed';
+          call.status = 'no-answer';
           call.currentStep = step;
+          call.completedAt = new Date();
+          call.responses.set('no_response', 'customer_silent');
+          
+          // Calculate duration if not already set
+          if (!call.duration && call.createdAt) {
+            const durationMs = new Date() - new Date(call.createdAt);
+            call.duration = Math.floor(durationMs / 1000);
+          }
+          
           await call.save();
+          console.log(`✅ Call no-answer with duration: ${call.duration} seconds`);
         }
       }
 
@@ -706,10 +805,24 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       if (previousResponse && phoneNumber && call) {
         console.log(`Storing response for question ${questionIndex}: ${previousResponse}`);
         
-        // Update call record with response
+        // Analyze the response using AI to determine Yes/No/Maybe
+        const analysisResult = await analyzeCustomerResponse(previousResponse, questions[questionIndex - 1]?.question || '');
+        console.log(`🤖 AI Analysis Result: ${analysisResult}`);
+        
+        // Update call record with response and analysis
         call.responses.set(questionIndex.toString(), previousResponse);
         call.currentStep = step;
         call.status = 'in-progress';
+        
+        // Store analysis result
+        if (!call.evaluation) {
+          call.evaluation = {
+            result: analysisResult,
+            comments: []
+          };
+        } else {
+          call.evaluation.result = analysisResult;
+        }
         
         // Store conversation in transcription field with proper formatting
         let conversation = call.transcription || '';
@@ -727,6 +840,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         if (questionIndex >= 0 && questionIndex < questions.length) {
           conversation += `VokAI: Question ${questionIndex + 1}: ${questions[questionIndex].question}\n`;
           conversation += `User: ${previousResponse}\n`;
+          conversation += `VokAI: [Analysis: ${analysisResult}]\n`;
         }
         
         call.transcription = conversation;
@@ -734,6 +848,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         await call.save();
 
         console.log('✅ Response stored in database');
+        console.log('✅ AI Analysis completed:', analysisResult);
         console.log('✅ Conversation updated:', conversation);
       }
 
@@ -742,9 +857,23 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         // End of questions - play outro
         console.log('End of questions reached, playing outro...');
         
-        // Use smart hybrid for outro (HIGH PRIORITY)
+        // Analyze all responses to provide personalized thank you
+        const allResponses = Array.from(call.responses.values());
+        const positiveResponses = allResponses.filter(response => {
+          const analysis = response.toLowerCase();
+          return ['yes', 'yeah', 'sure', 'interested', 'definitely'].some(word => analysis.includes(word));
+        });
+        
+        let thankYouMessage = '';
+        if (positiveResponses.length > allResponses.length / 2) {
+          thankYouMessage = `Excellent! Thank you so much for taking the time to answer all our questions. Based on your positive responses, our team will be in touch with you soon with more details.`;
+        } else {
+          thankYouMessage = `Thank you so much for taking the time to answer all our questions. Your honest feedback is very valuable to us, and we appreciate your time.`;
+        }
+        
+        // Use smart hybrid for personalized outro (HIGH PRIORITY)
         await generateSmartAudio(
-          'Excellent! Thank you so much for taking the time to answer all our questions. Your responses have been successfully recorded and are very valuable to us.',
+          thankYouMessage,
           'outro',
           callId,
           twimlResponse,
@@ -756,7 +885,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         
         // Use smart hybrid for final message
         await generateSmartAudio(
-          'Our team will carefully review your responses and may follow up if needed. Thank you for choosing Vok AI, and have a fantastic day!',
+          'Our team will carefully review your responses. Thank you for choosing Vok AI, and have a wonderful day!',
           'final',
           callId,
           twimlResponse,
@@ -770,7 +899,16 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         if (call) {
           call.status = 'completed';
           call.currentStep = step;
+          call.completedAt = new Date();
+          
+          // Calculate duration if not already set
+          if (!call.duration && call.createdAt) {
+            const durationMs = new Date() - new Date(call.createdAt);
+            call.duration = Math.floor(durationMs / 1000); // Convert to seconds
+          }
+          
           await call.save();
+          console.log(`✅ Call completed with duration: ${call.duration} seconds`);
         }
 
       } else {
@@ -842,8 +980,23 @@ router.post('/status', validateTwilioRequest, async (req, res) => {
     const call = await Call.findOne({ twilioCallSid: CallSid });
     if (call) {
       const previousStatus = call.status;
-      call.status = CallStatus;
-      if (CallDuration) call.duration = parseInt(CallDuration);
+      
+      // Map Twilio status to our internal status
+      let mappedStatus = CallStatus;
+      if (CallStatus === 'completed' && CallDuration && parseInt(CallDuration) < 10) {
+        mappedStatus = 'no-answer'; // Very short calls are likely ignored
+      }
+      
+      call.status = mappedStatus;
+      if (CallDuration) {
+        call.duration = parseInt(CallDuration);
+        console.log(`📞 Duration updated: ${call.duration} seconds`);
+      }
+      
+      // Set completion time for final statuses
+      if (['completed', 'failed', 'busy', 'no-answer', 'canceled'].includes(mappedStatus)) {
+        call.completedAt = new Date();
+      }
       
       // Only update transcription if it's empty or contains placeholder text
       if (!call.transcription || call.transcription.includes('[Call in progress')) {

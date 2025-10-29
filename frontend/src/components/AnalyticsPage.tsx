@@ -3,23 +3,16 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { 
-  BarChart3, 
   PhoneCall, 
-  Users, 
   TrendingUp, 
   Clock, 
   CheckCircle, 
   XCircle, 
-  Calendar,
   RefreshCw,
-  Eye,
   Trash2,
   AlertTriangle,
   X,
-  Activity,
-  PieChart,
-  BarChart,
-  LineChart
+  Activity
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import * as auth from "../lib/auth";
@@ -385,20 +378,6 @@ const AnalyticsPage: React.FC = () => {
     setSelectedCalls([]);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'failed': return 'bg-red-500/20 text-red-400 border-red-500/30';
-      case 'in-progress': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-      case 'initiated': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'ringing': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
-      case 'answered': return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'busy': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-      case 'no-answer': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      case 'canceled': return 'bg-red-500/20 text-red-400 border-red-500/30';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-    }
-  };
 
   const getResultColor = (result: 'YES' | 'NO' | 'MAYBE') => {
     switch (result) {
@@ -418,20 +397,6 @@ const AnalyticsPage: React.FC = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed': return <CheckCircle className="w-4 h-4" />;
-      case 'failed': return <XCircle className="w-4 h-4" />;
-      case 'in-progress': return <Clock className="w-4 h-4" />;
-      case 'initiated': return <Activity className="w-4 h-4" />;
-      case 'ringing': return <PhoneCall className="w-4 h-4" />;
-      case 'answered': return <CheckCircle className="w-4 h-4" />;
-      case 'busy': return <XCircle className="w-4 h-4" />;
-      case 'no-answer': return <XCircle className="w-4 h-4" />;
-      case 'canceled': return <XCircle className="w-4 h-4" />;
-      default: return <Activity className="w-4 h-4" />;
-    }
-  };
 
   // Fix duration formatting - duration is in seconds
   const formatDuration = (seconds: number) => {
@@ -873,7 +838,7 @@ const AnalyticsPage: React.FC = () => {
                         </th>
                         <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Customer</th>
                         <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Module</th>
-                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Type</th>
+                        <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Status</th>
                         <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Duration</th>
                         <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Result</th>
                         <th className="text-left py-4 px-4 text-xs sm:text-sm text-zinc-400 font-medium">Date</th>
@@ -901,9 +866,28 @@ const AnalyticsPage: React.FC = () => {
                             <span className="text-xs sm:text-sm text-white truncate block max-w-[120px] sm:max-w-[150px]">{call.moduleName || 'Unknown'}</span>
                           </td>
                           <td className="py-4 px-4">
-                            <Badge className={`text-xs ${call.callType === 'bulk' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-purple-500/20 text-purple-400 border-purple-500/30'}`}>
-                              {call.callType === 'bulk' ? 'Bulk' : 'Individual'}
-                            </Badge>
+                            {(() => {
+                              const getStatusDisplay = (status: string) => {
+                                switch (status) {
+                                  case 'completed': return { text: 'Successful', color: 'bg-green-500/20 text-green-400 border-green-500/30' };
+                                  case 'failed': return { text: 'Failed', color: 'bg-red-500/20 text-red-400 border-red-500/30' };
+                                  case 'busy': return { text: 'Busy', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' };
+                                  case 'no-answer': return { text: 'Ignored', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' };
+                                  case 'canceled': return { text: 'Canceled', color: 'bg-red-500/20 text-red-400 border-red-500/30' };
+                                  case 'in-progress': return { text: 'In Progress', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' };
+                                  case 'initiated': return { text: 'Initiated', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' };
+                                  case 'ringing': return { text: 'Ringing', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' };
+                                  case 'answered': return { text: 'Answered', color: 'bg-green-500/20 text-green-400 border-green-500/30' };
+                                  default: return { text: 'Unknown', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' };
+                                }
+                              };
+                              const statusDisplay = getStatusDisplay(call.status);
+                              return (
+                                <Badge className={`text-xs ${statusDisplay.color}`}>
+                                  {statusDisplay.text}
+                                </Badge>
+                              );
+                            })()}
                           </td>
                           <td className="py-4 px-4">
                             <span className="text-xs sm:text-sm text-white font-medium">{formatDuration(call.duration)}</span>
@@ -919,63 +903,13 @@ const AnalyticsPage: React.FC = () => {
                             )}
                           </td>
                           <td className="py-4 px-4">
-                            <span className="text-xs text-zinc-400">{formatDate(call.createdAt)}</span>
-                            {call.transcription && (
-                              <div className="mt-2">
-                                <details className="group">
-                                  <summary className="cursor-pointer text-blue-400 hover:text-blue-300 font-medium text-sm flex items-center gap-1 transition-all duration-200">
-                                    <span className="group-open:hidden">View Conversation</span>
-                                    <span className="hidden group-open:inline">Hide Conversation</span>
-                                    <svg className="w-4 h-4 transition-transform duration-200 ease-out group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                  </summary>
-                                  <div className="mt-3 overflow-hidden transition-all duration-300 ease-out max-h-0 group-open:max-h-96">
-                                    <div className="p-4 bg-zinc-800/30 border border-zinc-700/50 rounded-lg">
-                                      <div className="flex items-center justify-between mb-3 pb-2 border-b border-zinc-700/50">
-                                        <h4 className="text-sm font-medium text-white">Call Transcript</h4>
-                                        <span className="text-xs text-zinc-400 bg-zinc-700/50 px-2 py-1 rounded">
-                                          {formatDuration(call.duration)}
-                                        </span>
-                                      </div>
-                                      <div className="space-y-3 max-h-32 overflow-y-auto">
-                                        {call.transcription.split('\n').map((line, index) => {
-                                          if (!line.trim()) return null;
-                                          
-                                          if (line.startsWith('VokAI:')) {
-                                            return (
-                                              <div key={index} className="flex items-start gap-2">
-                                                <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
-                                                <div className="flex-1">
-                                                  <span className="text-xs text-blue-400 font-medium">VokAI</span>
-                                                  <div className="text-sm text-zinc-200 mt-1">{line.replace('VokAI:', '').trim()}</div>
-                                                </div>
-                                              </div>
-                                            );
-                                          } else if (line.startsWith('User:')) {
-                                            return (
-                                              <div key={index} className="flex items-start gap-2">
-                                                <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-                                                <div className="flex-1">
-                                                  <span className="text-xs text-green-400 font-medium">Customer</span>
-                                                  <div className="text-sm text-zinc-200 mt-1">{line.replace('User:', '').trim()}</div>
-                                                </div>
-                                              </div>
-                                            );
-                                          } else {
-                                            return (
-                                              <div key={index} className="text-xs text-zinc-500 italic pl-4">
-                                                {line}
-                                              </div>
-                                            );
-                                          }
-                                        })}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </details>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs text-zinc-400">{formatDate(call.createdAt)}</span>
+                              <div className="flex items-center gap-1 text-xs text-blue-400/60">
+                                <Clock className="w-3 h-3" />
+                                <span>Live Call Recording Coming Soon</span>
                               </div>
-                            )}
+                            </div>
                           </td>
                           <td className="py-4 px-4">
                             <Button
