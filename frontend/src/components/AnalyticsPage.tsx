@@ -13,11 +13,13 @@ import {
   AlertTriangle,
   X,
   Activity,
-  PhoneOutgoing
+  PhoneOutgoing,
+  Eye
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import * as auth from "../lib/auth";
 import { api } from "../lib/api";
+import LiveCallModal from "./LiveCallModal";
 
 interface CallData {
   _id: string;
@@ -93,6 +95,11 @@ const AnalyticsPage: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
   const [selectedModuleFilter, setSelectedModuleFilter] = useState<string>('all');
   const [retryingCall, setRetryingCall] = useState<string | null>(null);
+  const [liveCallModal, setLiveCallModal] = useState<{
+    callId: string;
+    customerName: string;
+    phoneNumber: string;
+  } | null>(null);
 
   const fetchAnalyticsData = async () => {
     if (!user) return;
@@ -508,6 +515,16 @@ const AnalyticsPage: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {/* Live Call Modal */}
+        {liveCallModal && (
+          <LiveCallModal
+            callId={liveCallModal.callId}
+            customerName={liveCallModal.customerName}
+            phoneNumber={liveCallModal.phoneNumber}
+            onClose={() => setLiveCallModal(null)}
+          />
+        )}
       </div>
     );
   }
@@ -816,6 +833,16 @@ const AnalyticsPage: React.FC = () => {
           </Card>
         )}
 
+        {/* Live Call Modal */}
+        {liveCallModal && (
+          <LiveCallModal
+            callId={liveCallModal.callId}
+            customerName={liveCallModal.customerName}
+            phoneNumber={liveCallModal.phoneNumber}
+            onClose={() => setLiveCallModal(null)}
+          />
+        )}
+
         {/* Recent Calls Table */}
         <Card className="bg-zinc-900/50 border-zinc-800 p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
@@ -957,10 +984,21 @@ const AnalyticsPage: React.FC = () => {
                           <td className="py-4 px-4">
                             <div className="flex flex-col gap-1">
                               <span className="text-xs text-zinc-400">{formatDate(call.createdAt)}</span>
-                              <div className="flex items-center gap-1 text-xs text-blue-400/60">
-                                <Clock className="w-3 h-3" />
-                                <span>Live Call Recording Coming Soon</span>
-                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setLiveCallModal({
+                                  callId: call._id,
+                                  customerName: call.customerName,
+                                  phoneNumber: call.phoneNumber
+                                })}
+                                className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 p-1 h-auto justify-start"
+                              >
+                                <Eye className="w-3 h-3" />
+                                <span>
+                                  {call.status === 'in-progress' ? 'View Live Transcript' : 'View Transcript'}
+                                </span>
+                              </Button>
                             </div>
                           </td>
                           <td className="py-4 px-4">

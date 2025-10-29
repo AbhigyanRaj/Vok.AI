@@ -8,6 +8,7 @@ import User from '../models/User.js';
 import Module from '../models/Module.js';
 import Call from '../models/Call.js';
 import { protect } from '../middleware/auth.js';
+import { broadcastTranscriptUpdate, broadcastCallStatus, cleanupCallClients } from '../websocket/liveCallServer.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
@@ -487,6 +488,17 @@ router.post('/initiate', protect, async (req, res) => {
       timestamp: Date.now()
     });
 
+    // Broadcast call started status to WebSocket clients
+    try {
+      broadcastCallStatus(callRecord._id.toString(), 'started', {
+        customerName: callRecord.customerName,
+        phoneNumber: callRecord.phoneNumber,
+        moduleName: module.name
+      });
+    } catch (error) {
+      console.error('WebSocket broadcast error (non-critical):', error);
+    }
+
     return res.json({
       success: true,
       message: 'REAL call initiated successfully!',
@@ -864,6 +876,20 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         
         await call.save();
 
+        // Broadcast transcript update to WebSocket clients
+        try {
+          broadcastTranscriptUpdate(call._id.toString(), {
+            speaker: 'User',
+            text: previousResponse,
+            analysis: analysisResult,
+            questionIndex: questionIndex,
+            question: questions[questionIndex]?.question,
+            conversation: conversation
+          });
+        } catch (error) {
+          console.error('WebSocket broadcast error (non-critical):', error);
+        }
+
         console.log('✅ Response stored in database');
         console.log('✅ AI Analysis completed:', analysisResult);
         console.log('✅ Conversation updated:', conversation);
@@ -892,6 +918,19 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           thankYouMessage = `Thank you so much for taking the time to answer all our questions. Your honest feedback is very valuable to us, and we appreciate your time.`;
         }
         
+        // Broadcast AI outro message to WebSocket clients
+        try {
+          broadcastTranscriptUpdate(call._id.toString(), {
+            speaker: 'AI',
+            text: thankYouMessage,
+            type: 'outro',
+            questionIndex: -1,
+            question: 'Call completion'
+          });
+        } catch (error) {
+          console.error('WebSocket broadcast error (non-critical):', error);
+        }
+
         // Use smart hybrid for personalized outro (HIGH PRIORITY)
         await generateSmartAudio(
           thankYouMessage,
@@ -1213,6 +1252,20 @@ async function processCallCompletion(call, phoneNumber) {
     // Clean up active call tracking
     if (phoneNumber && activeCalls.has(phoneNumber)) {
       activeCalls.delete(phoneNumber);
+    }
+
+    // Broadcast call completion and cleanup WebSocket clients
+    try {
+      broadcastCallStatus(call._id.toString(), 'completed', {
+        evaluation: evaluation,
+        duration: call.duration,
+        summary: call.summary
+      });
+      
+      // Clean up WebSocket clients for this call
+      cleanupCallClients(call._id.toString());
+    } catch (error) {
+      console.error('WebSocket cleanup error (non-critical):', error);
     }
 
     console.log(`Call processing completed. Evaluation: ${evaluation}`);
@@ -1857,13 +1910,56 @@ router.delete('/batch/delete', protect, async (req, res) => {
     console.error('Batch delete calls error:', error);
     res.status(500).json({ 
       error: 'Failed to delete calls',
-      message: error.message 
+    });
+  }
+});
+
+// Get individual call details for transcript modal
+router.get('/:callId', protect, async (req, res) => {
+  try {
+    const { callId } = req.params;
+    
+    // Find the call by ID
+    const call = await Call.findById(callId).populate('moduleId', 'name');
+    
+    if (!call) {
+      return res.status(404).json({
+        success: false,
+        error: 'Call not found'
+      });
+    }
+    
+    // Check if user owns this call
+    if (call.userId.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+    }
+    
+    // Convert responses Map to object for JSON serialization
+    const callData = {
+      ...call.toObject(),
+      responses: call.responses ? Object.fromEntries(call.responses) : {},
+      moduleName: call.moduleId?.name || 'Unknown Module'
+    };
+    
+    res.json({
+      success: true,
+      call: callData
+    });
+    
+  } catch (error) {
+    console.error('Error fetching call details:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch call details'
     });
   }
 });
 
 // Health check endpoint
-router.get('/health', (req, res) => {
+router.get('/health', async (req, res) => {
   try {
     res.json({
       status: 'healthy',
