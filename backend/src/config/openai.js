@@ -17,7 +17,7 @@ export const transcribeAudio = async (audioBuffer) => {
 
 export const generateSummary = async (text) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
     const prompt = `You are a helpful assistant that summarizes call transcripts and extracts key insights. Please summarize this call transcript and extract key insights: ${text}`;
     
     const result = await model.generateContent(prompt);
@@ -64,7 +64,7 @@ You are a loan decisioning expert. Respond only with YES, NO, or INVESTIGATION_R
 };
 
 /**
- * Evaluate credit card application based on responses
+ * Analyze customer response using Gemini AI
  */
 export const evaluateCreditCardApplication = async (applicationData) => {
   const prompt = `
@@ -87,7 +87,7 @@ You are a credit card decisioning expert. Respond only with YES, NO, or INVESTIG
 `;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text().trim();
@@ -102,7 +102,7 @@ You are a credit card decisioning expert. Respond only with YES, NO, or INVESTIG
  */
 export const analyzeResponseWithGemini = async (prompt) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text().trim();
@@ -157,7 +157,7 @@ export const evaluateApplication = async (applicationType, applicationData) => {
     // For custom modules, check if there are actual question responses
     const hasQuestionResponses = Object.keys(applicationData).some(key => {
       const numKey = parseInt(key);
-      return !isNaN(numKey) && numKey > 0;
+      return !isNaN(numKey) && numKey >= 0; // Changed from > 0 to >= 0 since questions start at index 0
     });
     
     if (!hasQuestionResponses) {
@@ -165,8 +165,33 @@ export const evaluateApplication = async (applicationType, applicationData) => {
       return 'DECLINED';
     }
     
-    // For custom modules with responses, return INVESTIGATION_REQUIRED
-    return 'INVESTIGATION_REQUIRED';
+    // For custom modules with responses, analyze the sentiment
+    // Check if responses are positive
+    const responses = Object.values(applicationData);
+    const positiveKeywords = ['yes', 'yeah', 'sure', 'definitely', 'absolutely', 'interested', 'need', 'want', 'helpful', 'great', 'good'];
+    const negativeKeywords = ['no', 'not', 'never', 'don\'t', 'won\'t', 'can\'t'];
+    
+    let positiveCount = 0;
+    let negativeCount = 0;
+    
+    responses.forEach(response => {
+      const lowerResponse = response.toLowerCase();
+      if (positiveKeywords.some(word => lowerResponse.includes(word))) {
+        positiveCount++;
+      }
+      if (negativeKeywords.some(word => lowerResponse.includes(word))) {
+        negativeCount++;
+      }
+    });
+    
+    // Determine result based on sentiment
+    if (positiveCount > negativeCount && positiveCount > 0) {
+      return 'YES';
+    } else if (negativeCount > positiveCount) {
+      return 'NO';
+    } else {
+      return 'MAYBE';
+    }
   }
   
   if (applicationType === 'loan') {
