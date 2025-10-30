@@ -334,10 +334,10 @@ router.post('/initiate', protect, async (req, res) => {
         // Handle specific Twilio trial account errors
         if (twilioError.code === 21211 || twilioError.message?.includes('unverified')) {
           return res.status(400).json({
-            error: 'Trial account limitation',
-            message: `The number ${formattedPhone} is unverified. Trial accounts may only make calls to verified numbers. Please verify this number in your Twilio console or upgrade to a paid account.`,
-            code: 'UNVERIFIED_NUMBER',
-            suggestion: 'To verify numbers, go to Twilio Console > Phone Numbers > Verified Caller IDs'
+            error: 'Twilio Subscription Required',
+            message: 'Vok.AI needs a Twilio subscription to make calls available for all users. To see the working platform, please watch our demo video.',
+            code: 'SUBSCRIPTION_REQUIRED',
+            suggestion: 'Watch the complete demo video on our homepage to see Vok.AI in action'
           });
         }
         
@@ -439,10 +439,10 @@ router.post('/initiate', protect, async (req, res) => {
         // Handle specific Twilio trial account errors
         if (twilioError.code === 21211 || twilioError.message?.includes('unverified')) {
           return res.status(400).json({
-            error: 'Trial account limitation',
-            message: `The number ${formattedPhone} is unverified. Trial accounts may only make calls to verified numbers. Please verify this number in your Twilio console or upgrade to a paid account.`,
-            code: 'UNVERIFIED_NUMBER',
-            suggestion: 'To verify numbers, go to Twilio Console > Phone Numbers > Verified Caller IDs'
+            error: 'Twilio Subscription Required',
+            message: 'Vok.AI needs a Twilio subscription to make calls available for all users. To see the working platform, please watch our demo video.',
+            code: 'SUBSCRIPTION_REQUIRED',
+            suggestion: 'Watch the complete demo video on our homepage to see Vok.AI in action'
           });
         }
         

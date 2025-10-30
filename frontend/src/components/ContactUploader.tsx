@@ -288,12 +288,9 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
       } else {
         console.error('Call initiation failed:', result.error);
         
-        // Handle trial account limitation
-        if (result.error === 'Trial account limitation' || result.code === 'UNVERIFIED_NUMBER') {
-          setError(`Call failed: ${result.message}`);
-          if (result.suggestion) {
-            setError(prev => prev + '\n\n' + result.suggestion);
-          }
+        // Handle subscription requirement
+        if (result.error === 'Twilio Subscription Required' || result.code === 'SUBSCRIPTION_REQUIRED' || result.error === 'Trial account limitation' || result.code === 'UNVERIFIED_NUMBER') {
+          setError('Vok.AI needs a Twilio subscription to make calls available for all users. To see the working platform, please watch our demo video.');
           return false;
         }
         
