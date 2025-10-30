@@ -92,6 +92,25 @@ const Hero: React.FC = () => {
           <p className="text-xs sm:text-sm md:text-base mb-6 sm:mb-8 md:mb-10 max-w-2xl mx-auto font-light text-white/70 leading-relaxed px-4">
             Create questions, call customers, and let AI extract Yes/No/Maybe from conversations.
           </p>
+          
+          {/* Demo Video */}
+          <div className="mb-8 sm:mb-10 md:mb-12 px-4">
+            <div className="max-w-3xl mx-auto">
+              <div className="relative aspect-video rounded-2xl overflow-hidden bg-black/20 backdrop-blur-sm border border-white/10">
+                <iframe
+                  src="https://www.youtube.com/embed/mM4SGf_Mhm0"
+                  title="Vok.AI Demo - AI-Powered Voice Calling Platform"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full"
+                ></iframe>
+              </div>
+              <p className="text-xs text-white/50 text-center mt-3">
+                Watch Vok.AI in action - Complete platform demo
+              </p>
+            </div>
+          </div>
           {/* Auth or Create Module Button */}
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-6 sm:mb-8 md:mb-10 px-4">
             {!user ? (
