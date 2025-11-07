@@ -6,8 +6,11 @@ import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Load environment variables FIRST
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables FIRST - with explicit path
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // Validate environment variables
 import { validateEnvironment } from './utils/envValidator.js';
@@ -103,6 +106,12 @@ app.use(limiter);
 // Connect to MongoDB and initialize
 const startServer = async () => {
   try {
+    // Log TTS configuration
+    console.log('\n🎤 TTS Configuration:');
+    console.log(`   Google TTS API Key: ${process.env.GOOGLE_TTS_API_KEY ? '✅ Configured' : '❌ Missing'}`);
+    console.log(`   ElevenLabs API Key: ${process.env.ELEVENLABS_API_KEY ? '✅ Configured' : '❌ Missing'}`);
+    console.log(`   Twilio: ✅ Always available (fallback)\n`);
+    
     // Connect to MongoDB
     await connectDB();
     

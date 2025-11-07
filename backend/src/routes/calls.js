@@ -9,6 +9,7 @@ import Module from '../models/Module.js';
 import Call from '../models/Call.js';
 import { protect } from '../middleware/auth.js';
 import { broadcastTranscriptUpdate, broadcastCallStatus, cleanupCallClients } from '../websocket/liveCallServer.js';
+import { generateHybridTTS, getTTSUsageStats, listAvailableVoices, testAllTTSServices } from '../services/hybridTTS.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
@@ -119,8 +120,8 @@ function hasPublicUrl() {
   return baseUrl && !baseUrl.includes('localhost') && !baseUrl.includes('127.0.0.1');
 }
 
-// Simple Twilio TTS function (replaces ElevenLabs)
-async function generateSmartAudio(text, audioType, callId, twimlResponse, selectedVoice = 'RACHEL', moduleId = null, dbCallId = null) {
+// NEW: Smart Hybrid TTS function with Google TTS (Indian voices) → ElevenLabs → Twilio fallback
+async function generateSmartAudio(text, audioType, callId, twimlResponse, selectedVoice = 'FEMALE_INDIAN', moduleId = null, dbCallId = null) {
   console.log(`🎤 [${audioType.toUpperCase()}] AI SAYS: "${text}"`);
   
   // Broadcast AI speech to WebSocket clients using database call ID if available
@@ -139,50 +140,144 @@ async function generateSmartAudio(text, audioType, callId, twimlResponse, select
     }
   }
   
-  twimlResponse.say(text, { 
-    voice: HYBRID_CONFIG.TWILIO_VOICE,
-    language: HYBRID_CONFIG.TWILIO_LANGUAGE
-  });
+  try {
+    // Use hybrid TTS system (Google → ElevenLabs → Twilio)
+    const result = await generateHybridTTS(text, selectedVoice, {
+      audioType,
+      callId
+    });
+    
+    if (result.success) {
+      if (result.useTwiML) {
+        // Fallback to Twilio TTS
+        console.log(`   Using Twilio TTS fallback: ${result.voice}`);
+        twimlResponse.say(result.text, { 
+          voice: result.voice,
+          language: result.language
+        });
+      } else {
+        // Use generated audio file
+        const baseUrl = process.env.BASE_URL || 'http://localhost:5001';
+        const audioUrl = `${baseUrl}${result.audioUrl}`;
+        console.log(`   ✅ Playing audio from ${result.source}: ${audioUrl}`);
+        twimlResponse.play(audioUrl);
+      }
+    } else {
+      // Final fallback
+      console.log('   Using final Twilio fallback');
+      twimlResponse.say(text, { 
+        voice: 'Polly.Aditi',
+        language: 'en-IN'
+      });
+    }
+  } catch (error) {
+    console.error('   ❌ TTS generation failed:', error.message);
+    // Ultimate fallback
+    twimlResponse.say(text, { 
+      voice: 'Polly.Aditi',
+      language: 'en-IN'
+    });
+  }
 }
 
 // Track active calls (in memory - in production, use Redis)
 const activeCalls = new Map();
 
-// Test ElevenLabs TTS generation (must be before parameterized routes)
-router.get('/test-elevenlabs-tts', async (req, res) => {
+// NEW: Test Hybrid TTS System (Google → ElevenLabs → Twilio)
+router.get('/test-tts', async (req, res) => {
   try {
-    console.log('🧪 Testing ElevenLabs TTS generation...');
+    console.log('🧪 Testing Hybrid TTS System...');
     
-    const testText = 'Hello! This is a test of ElevenLabs text-to-speech. If you can hear this, ElevenLabs is working perfectly!';
-    const voiceType = 'RACHEL';
+    const testResults = await testAllTTSServices();
+    const usage = getTTSUsageStats();
+    const voices = listAvailableVoices();
     
-    console.log('🎯 Attempting to generate speech...');
-    const result = await generateAndSaveAudioWithFallback(testText, voiceType, 'test');
+    res.json({
+      success: true,
+      message: 'TTS System Test Complete',
+      services: testResults,
+      usage: usage,
+      availableVoices: voices,
+      recommendation: 'Google TTS with Indian voices is now primary!'
+    });
+  } catch (error) {
+    console.error('❌ TTS test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'TTS test failed',
+      error: error.message
+    });
+  }
+});
+
+// Test Google TTS specifically
+router.get('/test-google-tts', async (req, res) => {
+  try {
+    console.log('🧪 Testing Google TTS...');
     
-    if (result.fallback) {
+    const testText = req.query.text || 'Hello! This is a test of Google Text to Speech with Indian English voice. Namaste!';
+    const voice = req.query.voice || 'FEMALE_INDIAN';
+    
+    const result = await generateHybridTTS(testText, voice, { forceService: 'google' });
+    
+    if (result.success && !result.useTwiML) {
+      const baseUrl = process.env.BASE_URL || 'http://localhost:5001';
       res.json({
-        success: false,
-        message: 'ElevenLabs failed, using Twilio fallback',
-        fallback: true,
-        twiml: result.twiml,
-        error: 'ElevenLabs API call failed'
+        success: true,
+        message: 'Google TTS working perfectly!',
+        audioUrl: `${baseUrl}${result.audioUrl}`,
+        source: result.source,
+        voiceUsed: result.voiceUsed,
+        cached: result.cached,
+        audioSize: result.audioBuffer?.length
       });
     } else {
       res.json({
-        success: true,
-        message: 'ElevenLabs TTS working perfectly!',
-        audioUrl: result.audioUrl,
-        fallback: false,
-        voiceType: voiceType
+        success: false,
+        message: 'Google TTS not available, using fallback',
+        fallback: true
       });
     }
   } catch (error) {
-    console.error('❌ ElevenLabs TTS test failed:', error);
+    console.error('❌ Google TTS test failed:', error);
     res.status(500).json({
       success: false,
-      message: 'ElevenLabs TTS test failed',
-      error: error.message,
-      stack: error.stack
+      message: 'Google TTS test failed',
+      error: error.message
+    });
+  }
+});
+
+// Get TTS usage statistics
+router.get('/tts-stats', async (req, res) => {
+  try {
+    const stats = getTTSUsageStats();
+    res.json({
+      success: true,
+      stats: stats
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// List available voices
+router.get('/voices', async (req, res) => {
+  try {
+    const voices = listAvailableVoices();
+    res.json({
+      success: true,
+      voices: voices,
+      default: 'FEMALE_INDIAN',
+      description: 'All voices support Indian English accent'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });
