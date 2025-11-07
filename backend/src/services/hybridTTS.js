@@ -19,7 +19,6 @@ if (!fs.existsSync(AUDIO_DIR)) {
 // TTS Priority Configuration
 const TTS_STRATEGY = {
   PRIMARY: 'google',      // Google TTS (Indian voices, free tier)
-  SECONDARY: 'elevenlabs', // ElevenLabs (premium, limited)
   FALLBACK: 'twilio'      // Twilio Polly (always available)
 };
 
@@ -97,7 +96,7 @@ function saveToCache(hash, audioBuffer) {
 
 /**
  * Smart Hybrid TTS Generator
- * Priority: Google TTS → ElevenLabs → Twilio Polly
+ * Priority: Google TTS → Twilio Polly
  */
 export async function generateHybridTTS(text, voiceType = DEFAULT_VOICE, options = {}) {
   const {
@@ -125,10 +124,10 @@ export async function generateHybridTTS(text, voiceType = DEFAULT_VOICE, options
     };
   }
 
-  // Try services in priority order
+  // Try services in priority order (Google → Twilio, ElevenLabs removed)
   const services = forceService 
     ? [forceService]
-    : ['google', 'elevenlabs', 'twilio'];
+    : ['google', 'twilio'];
 
   for (const service of services) {
     try {
