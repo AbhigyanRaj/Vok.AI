@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "./ui/button";
-import { Check, Zap, Rocket, Building2 } from "lucide-react";
 import * as auth from "../lib/auth";
 
 const BuyToken: React.FC = () => {
@@ -49,7 +48,6 @@ const BuyToken: React.FC = () => {
       tier: "starter",
       price: "₹499",
       period: "month",
-      icon: <Zap className="w-6 h-6 text-zinc-400" />,
       popular: false,
       callsIncluded: 100,
       costPerCall: "₹4.99",
@@ -71,7 +69,6 @@ const BuyToken: React.FC = () => {
       tier: "growth",
       price: "₹1,999",
       period: "month",
-      icon: <Rocket className="w-6 h-6 text-blue-400" />,
       popular: true,
       callsIncluded: 500,
       costPerCall: "₹3.99",
@@ -95,7 +92,6 @@ const BuyToken: React.FC = () => {
       tier: "business",
       price: "₹4,999",
       period: "month",
-      icon: <Building2 className="w-6 h-6 text-purple-400" />,
       popular: false,
       callsIncluded: 1500,
       costPerCall: "₹3.33",
@@ -121,7 +117,6 @@ const BuyToken: React.FC = () => {
       tier: "enterprise",
       price: "Custom",
       period: "pricing",
-      icon: <Building2 className="w-6 h-6 text-amber-400" />,
       popular: false,
       callsIncluded: "Custom",
       costPerCall: "From ₹2.50",
@@ -183,70 +178,55 @@ const BuyToken: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-zinc-950 px-4 py-8 pt-24">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-black px-6 py-20">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-white mb-3">
-            Choose Your Plan
+        <div className="text-center mb-20">
+          <h1 className="text-5xl md:text-6xl font-bold text-white mb-4 tracking-tight">
+            Pricing
           </h1>
-          <p className="text-zinc-400 text-base max-w-2xl mx-auto">
-            Simple, transparent pricing. Scale as you grow.
+          <p className="text-zinc-500 text-lg">
+            Choose the plan that fits your needs
           </p>
-          {user && (
-            <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg">
-              <span className="text-sm text-zinc-500">Current Plan:</span>
-              <span className="text-sm font-medium text-white">{user.subscription?.tier || 'Starter'}</span>
-            </div>
-          )}
         </div>
 
         {/* Subscription Plans */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-6xl mx-auto">
           {subscriptionPlans.map((plan, index) => (
             <div
               key={index}
-              className={`relative bg-zinc-900 border rounded-xl p-6 transition-all flex flex-col hover:border-zinc-700 ${
+              className={`relative bg-zinc-950 border transition-all flex flex-col ${
                 plan.popular
-                  ? "border-blue-500/50 shadow-lg shadow-blue-500/10"
-                  : "border-zinc-800"
+                  ? "border-white"
+                  : "border-zinc-900 hover:border-zinc-800"
               }`}
             >
               {plan.popular && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-medium">
-                    Most Popular
-                  </span>
+                <div className="absolute top-0 right-0 bg-white text-black px-3 py-1 text-xs font-medium">
+                  Popular
                 </div>
               )}
 
-              <div className="text-center mb-6">
-                <h3 className="text-xl font-bold text-white mb-4">{plan.name}</h3>
-                <div className="mb-4">
-                  <div className="flex items-baseline justify-center gap-1">
-                    <span className="text-4xl font-bold text-white">{plan.price}</span>
+              <div className="p-8">
+                <h3 className="text-lg font-medium text-white mb-8">{plan.name}</h3>
+                <div className="mb-8">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-5xl font-bold text-white tracking-tight">{plan.price}</span>
                     {plan.tier !== "enterprise" && (
-                      <span className="text-zinc-500 text-sm">/{plan.period}</span>
+                      <span className="text-zinc-600 text-base">/{plan.period}</span>
                     )}
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-sm text-zinc-400">
+                  <div className="mt-2 text-sm text-zinc-600">
                     {typeof plan.callsIncluded === 'number' 
-                      ? `${plan.callsIncluded} calls included` 
+                      ? `${plan.callsIncluded} calls` 
                       : plan.callsIncluded}
                   </div>
-                  <div className="text-xs text-zinc-500">
-                    {plan.costPerCall} per call
-                  </div>
                 </div>
-              </div>
 
-              <ul className="space-y-3 mb-6 flex-grow">
-                {plan.features.map((feature, featureIndex) => (
-                  <li key={featureIndex} className="flex items-start gap-3 text-zinc-400">
-                    <Check className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm leading-relaxed">{feature}</span>
+              <ul className="space-y-3 mb-8 flex-grow">
+                {plan.features.slice(0, 6).map((feature, featureIndex) => (
+                  <li key={featureIndex} className="text-sm text-zinc-500">
+                    {feature}
                   </li>
                 ))}
               </ul>
@@ -254,14 +234,14 @@ const BuyToken: React.FC = () => {
               {user?.subscription?.tier === plan.tier ? (
                 <Button
                   disabled
-                  className="w-full py-3 text-sm font-medium rounded-lg bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                  className="w-full py-3 text-sm font-medium bg-zinc-900 text-zinc-600 cursor-not-allowed border border-zinc-900"
                 >
                   Current Plan
                 </Button>
               ) : plan.tier === "enterprise" ? (
                 <Button
                   onClick={handleContactSales}
-                  className="w-full py-3 text-sm font-medium rounded-lg bg-white text-black hover:bg-zinc-100 transition-colors"
+                  className="w-full py-3 text-sm font-medium bg-white text-black hover:bg-zinc-200 transition-colors border-0"
                 >
                   Contact Sales
                 </Button>
@@ -269,112 +249,56 @@ const BuyToken: React.FC = () => {
                 <Button
                   onClick={() => handleUpgrade(plan.tier)}
                   disabled={loading}
-                  className={`w-full py-3 text-sm font-medium rounded-lg transition-colors ${
+                  className={`w-full py-3 text-sm font-medium transition-colors border-0 ${
                     plan.popular
-                      ? "bg-blue-500 text-white hover:bg-blue-600"
-                      : "bg-zinc-800 text-white hover:bg-zinc-700"
+                      ? "bg-white text-black hover:bg-zinc-200"
+                      : "bg-zinc-900 text-white hover:bg-zinc-800"
                   }`}
                 >
                   {loading ? "Processing..." : `Get Started`}
                 </Button>
               )}
+              </div>
             </div>
           ))}
         </div>
 
-        {/* Credit Add-ons Section */}
-        <div className="mt-16">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-white mb-3">Add-on Credits</h2>
-            <p className="text-zinc-400 text-base">
-              Need more calls? Purchase credits anytime. Never expires.
+        {/* Add-on Credits - Minimal */}
+        <div className="mt-24 max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl font-medium text-white mb-2">Need more calls?</h2>
+            <p className="text-zinc-600 text-sm">
+              Purchase additional credits anytime
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
-            {creditAddons.map((addon, index) => (
-              <div
+          <div className="grid grid-cols-3 gap-4">
+            {creditAddons.slice(1, 4).map((addon, index) => (
+              <button
                 key={index}
-                className={`relative bg-zinc-900 border rounded-xl p-5 transition-all hover:border-zinc-700 ${
-                  addon.popular ? "border-blue-500/50" : "border-zinc-800"
-                }`}
+                onClick={() => handleBuyCredits(addon.credits, addon.price)}
+                disabled={loading}
+                className="bg-zinc-950 border border-zinc-900 hover:border-zinc-800 transition-colors p-6 text-left"
               >
-                {addon.popular && (
-                  <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-blue-500 text-white px-2.5 py-1 rounded-full text-xs font-medium">
-                      Best Value
-                    </span>
-                  </div>
-                )}
-                {addon.savings !== "0%" && (
-                  <div className="absolute -top-2 -right-2">
-                    <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium">
-                      {addon.savings}
-                    </span>
-                  </div>
-                )}
-
-                <div className="text-center mb-4">
-                  <div className="text-3xl font-bold text-white mb-2">{addon.credits}</div>
-                  <div className="text-sm text-zinc-500">calls</div>
-                </div>
-
-                <div className="text-center mb-4">
-                  <div className="text-2xl font-bold text-white">₹{addon.price}</div>
-                  <div className="text-xs text-zinc-500 mt-1">{addon.costPerCall}/call</div>
-                </div>
-
-                <Button
-                  onClick={() => handleBuyCredits(addon.credits, addon.price)}
-                  disabled={loading}
-                  className={`w-full py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                    addon.popular
-                      ? "bg-blue-500 text-white hover:bg-blue-600"
-                      : "bg-zinc-800 text-white hover:bg-zinc-700"
-                  }`}
-                >
-                  Purchase
-                </Button>
-              </div>
+                <div className="text-2xl font-bold text-white mb-1">{addon.credits}</div>
+                <div className="text-sm text-zinc-600 mb-4">calls</div>
+                <div className="text-lg font-medium text-white">₹{addon.price}</div>
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Additional Info */}
-        <div className="mt-16 space-y-8">
-          {/* Value Proposition */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-              <div>
-                <div className="text-3xl font-bold text-white mb-2">₹3-6</div>
-                <div className="text-sm text-zinc-400">Cost per call</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-white mb-2">1-2s</div>
-                <div className="text-sm text-zinc-400">Response time</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-white mb-2">Hindi + English</div>
-                <div className="text-sm text-zinc-400">Native support</div>
-              </div>
-            </div>
-          </div>
-
-          {/* FAQ / Contact */}
-          <div className="text-center">
-            <p className="text-zinc-400 text-base mb-4">
-              Need a custom plan for high volume?
-            </p>
-            <button
-              onClick={handleContactSales}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-800 rounded-lg text-white hover:border-zinc-700 transition-colors"
-            >
-              Contact Sales
-            </button>
-            <p className="text-zinc-600 text-sm mt-6">
-              No setup fees · Cancel anytime · 7-day money-back guarantee
-            </p>
-          </div>
+        {/* Footer */}
+        <div className="mt-32 text-center">
+          <p className="text-zinc-600 text-sm mb-6">
+            Need a custom plan?
+          </p>
+          <button
+            onClick={handleContactSales}
+            className="text-white hover:text-zinc-400 transition-colors text-sm underline underline-offset-4"
+          >
+            Contact Sales
+          </button>
         </div>
       </div>
     </div>
