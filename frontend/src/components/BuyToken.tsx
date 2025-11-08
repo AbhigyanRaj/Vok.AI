@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "./ui/button";
-import { Check, Zap, Rocket, Building2, Plus, Sparkles } from "lucide-react";
+import { Check, Zap, Rocket, Building2 } from "lucide-react";
 import * as auth from "../lib/auth";
 
 const BuyToken: React.FC = () => {
@@ -186,72 +186,67 @@ const BuyToken: React.FC = () => {
     <div className="min-h-screen bg-zinc-950 px-4 py-8 pt-24">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-white mb-3">
-            Scale Your Voice Calling Operations
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-white mb-3">
+            Choose Your Plan
           </h1>
-          <p className="text-zinc-400 text-sm max-w-2xl mx-auto mb-2">
-            Transparent, volume-based pricing designed for businesses. Pay only for what you use with no hidden fees.
-          </p>
-          <p className="text-zinc-500 text-xs">
-            💰 Optimized pricing: ₹3-6/call • 🚀 No setup fees • 📞 Unlimited modules • 🌐 Hindi + English support
+          <p className="text-zinc-400 text-base max-w-2xl mx-auto">
+            Simple, transparent pricing. Scale as you grow.
           </p>
           {user && (
-            <div className="mt-4 inline-flex items-center gap-2 bg-zinc-900/50 border border-zinc-800 rounded-md px-4 py-2">
-              <span className="text-sm text-zinc-400">
-                Current Plan: <span className="font-semibold text-blue-400">{user.subscription?.tier || 'Starter'}</span>
-              </span>
+            <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg">
+              <span className="text-sm text-zinc-500">Current Plan:</span>
+              <span className="text-sm font-medium text-white">{user.subscription?.tier || 'Starter'}</span>
             </div>
           )}
         </div>
 
         {/* Subscription Plans */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {subscriptionPlans.map((plan, index) => (
             <div
               key={index}
-              className={`relative bg-zinc-900/30 border rounded-lg p-5 transition-all flex flex-col ${
+              className={`relative bg-zinc-900 border rounded-xl p-6 transition-all flex flex-col hover:border-zinc-700 ${
                 plan.popular
-                  ? "border-zinc-700"
+                  ? "border-blue-500/50 shadow-lg shadow-blue-500/10"
                   : "border-zinc-800"
               }`}
             >
               {plan.popular && (
-                <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-blue-500/10 border border-blue-500/30 text-blue-400 px-2.5 py-0.5 rounded-md text-xs">
-                    Popular
+                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                  <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+                    Most Popular
                   </span>
                 </div>
               )}
 
-              <div className="text-center mb-5">
-                <div className="flex justify-center mb-2">
-                  {plan.icon}
+              <div className="text-center mb-6">
+                <h3 className="text-xl font-bold text-white mb-4">{plan.name}</h3>
+                <div className="mb-4">
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="text-4xl font-bold text-white">{plan.price}</span>
+                    {plan.tier !== "enterprise" && (
+                      <span className="text-zinc-500 text-sm">/{plan.period}</span>
+                    )}
+                  </div>
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-1.5">{plan.name}</h3>
-                <div className="flex items-baseline justify-center gap-1 mb-1.5">
-                  <span className="text-2xl font-semibold text-white">{plan.price}</span>
-                  {plan.tier !== "free" && plan.tier !== "enterprise" && (
-                    <span className="text-zinc-500 text-xs">/{plan.period}</span>
-                  )}
-                  {plan.tier === "free" && (
-                    <span className="text-zinc-500 text-xs">{plan.period}</span>
-                  )}
-                </div>
-                <div className="text-xs text-zinc-500">
-                  {typeof plan.callsIncluded === 'number' 
-                    ? `${plan.callsIncluded} calls included` 
-                    : plan.callsIncluded}
-                  {" • "}
-                  {plan.costPerCall} per call
+                <div className="space-y-1">
+                  <div className="text-sm text-zinc-400">
+                    {typeof plan.callsIncluded === 'number' 
+                      ? `${plan.callsIncluded} calls included` 
+                      : plan.callsIncluded}
+                  </div>
+                  <div className="text-xs text-zinc-500">
+                    {plan.costPerCall} per call
+                  </div>
                 </div>
               </div>
 
-              <ul className="space-y-2 mb-5 flex-grow">
+              <ul className="space-y-3 mb-6 flex-grow">
                 {plan.features.map((feature, featureIndex) => (
-                  <li key={featureIndex} className="flex items-start gap-2 text-zinc-400">
-                    <Check className="w-3 h-3 text-zinc-600 flex-shrink-0 mt-0.5" />
-                    <span className="text-xs leading-relaxed">{feature}</span>
+                  <li key={featureIndex} className="flex items-start gap-3 text-zinc-400">
+                    <Check className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm leading-relaxed">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -259,14 +254,14 @@ const BuyToken: React.FC = () => {
               {user?.subscription?.tier === plan.tier ? (
                 <Button
                   disabled
-                  className="w-full py-2 text-xs font-medium rounded-md bg-zinc-800/50 text-zinc-500 cursor-not-allowed border border-zinc-800"
+                  className="w-full py-3 text-sm font-medium rounded-lg bg-zinc-800 text-zinc-500 cursor-not-allowed"
                 >
                   Current Plan
                 </Button>
               ) : plan.tier === "enterprise" ? (
                 <Button
                   onClick={handleContactSales}
-                  className="w-full py-2 text-xs font-medium rounded-md bg-white text-black hover:bg-zinc-100 transition-all"
+                  className="w-full py-3 text-sm font-medium rounded-lg bg-white text-black hover:bg-zinc-100 transition-colors"
                 >
                   Contact Sales
                 </Button>
@@ -274,13 +269,13 @@ const BuyToken: React.FC = () => {
                 <Button
                   onClick={() => handleUpgrade(plan.tier)}
                   disabled={loading}
-                  className={`w-full py-2 text-xs font-medium rounded-md transition-all ${
+                  className={`w-full py-3 text-sm font-medium rounded-lg transition-colors ${
                     plan.popular
                       ? "bg-blue-500 text-white hover:bg-blue-600"
-                      : "bg-white text-black hover:bg-zinc-100"
+                      : "bg-zinc-800 text-white hover:bg-zinc-700"
                   }`}
                 >
-                  {loading ? "Processing..." : `Upgrade to ${plan.name}`}
+                  {loading ? "Processing..." : `Get Started`}
                 </Button>
               )}
             </div>
@@ -288,61 +283,57 @@ const BuyToken: React.FC = () => {
         </div>
 
         {/* Credit Add-ons Section */}
-        <div className="mt-12">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 mb-2">
-              <Sparkles className="w-5 h-5 text-blue-400" />
-              <h2 className="text-2xl font-bold text-white">Need More Calls?</h2>
-            </div>
-            <p className="text-zinc-400 text-sm">
-              Buy credit add-ons anytime. Credits never expire and work with any plan.
+        <div className="mt-16">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-white mb-3">Add-on Credits</h2>
+            <p className="text-zinc-400 text-base">
+              Need more calls? Purchase credits anytime. Never expires.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
             {creditAddons.map((addon, index) => (
               <div
                 key={index}
-                className={`relative bg-zinc-900/30 border rounded-lg p-4 transition-all hover:border-blue-500/50 ${
-                  addon.popular ? "border-blue-500/30" : "border-zinc-800"
+                className={`relative bg-zinc-900 border rounded-xl p-5 transition-all hover:border-zinc-700 ${
+                  addon.popular ? "border-blue-500/50" : "border-zinc-800"
                 }`}
               >
                 {addon.popular && (
                   <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-blue-500/10 border border-blue-500/30 text-blue-400 px-2 py-0.5 rounded-md text-xs">
+                    <span className="bg-blue-500 text-white px-2.5 py-1 rounded-full text-xs font-medium">
                       Best Value
                     </span>
                   </div>
                 )}
                 {addon.savings !== "0%" && (
                   <div className="absolute -top-2 -right-2">
-                    <span className="bg-green-500/10 border border-green-500/30 text-green-400 px-1.5 py-0.5 rounded-md text-xs font-semibold">
-                      Save {addon.savings}
+                    <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+                      {addon.savings}
                     </span>
                   </div>
                 )}
 
-                <div className="text-center mb-3">
-                  <div className="text-3xl font-bold text-white mb-1">{addon.credits}</div>
-                  <div className="text-xs text-zinc-500">calls</div>
+                <div className="text-center mb-4">
+                  <div className="text-3xl font-bold text-white mb-2">{addon.credits}</div>
+                  <div className="text-sm text-zinc-500">calls</div>
                 </div>
 
-                <div className="text-center mb-3">
-                  <div className="text-xl font-semibold text-blue-400">₹{addon.price}</div>
+                <div className="text-center mb-4">
+                  <div className="text-2xl font-bold text-white">₹{addon.price}</div>
                   <div className="text-xs text-zinc-500 mt-1">{addon.costPerCall}/call</div>
                 </div>
 
                 <Button
                   onClick={() => handleBuyCredits(addon.credits, addon.price)}
                   disabled={loading}
-                  className={`w-full py-2 text-xs font-medium rounded-md transition-all ${
+                  className={`w-full py-2.5 text-sm font-medium rounded-lg transition-colors ${
                     addon.popular
                       ? "bg-blue-500 text-white hover:bg-blue-600"
-                      : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                      : "bg-zinc-800 text-white hover:bg-zinc-700"
                   }`}
                 >
-                  <Plus className="w-3 h-3 mr-1 inline" />
-                  Buy Credits
+                  Purchase
                 </Button>
               </div>
             ))}
@@ -350,39 +341,38 @@ const BuyToken: React.FC = () => {
         </div>
 
         {/* Additional Info */}
-        <div className="mt-10 space-y-6">
+        <div className="mt-16 space-y-8">
           {/* Value Proposition */}
-          <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-white mb-4 text-center">Why Choose Vok.AI?</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
               <div>
-                <div className="text-2xl font-bold text-blue-400 mb-1">₹3-6</div>
-                <div className="text-xs text-zinc-400">Per call (vs ₹15-30 competitors)</div>
+                <div className="text-3xl font-bold text-white mb-2">₹3-6</div>
+                <div className="text-sm text-zinc-400">Cost per call</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-blue-400 mb-1">0.9-1.8s</div>
-                <div className="text-xs text-zinc-400">Response latency (industry-leading)</div>
+                <div className="text-3xl font-bold text-white mb-2">1-2s</div>
+                <div className="text-sm text-zinc-400">Response time</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-blue-400 mb-1">Hindi+EN</div>
-                <div className="text-xs text-zinc-400">Native bilingual support</div>
+                <div className="text-3xl font-bold text-white mb-2">Hindi + English</div>
+                <div className="text-sm text-zinc-400">Native support</div>
               </div>
             </div>
           </div>
 
           {/* FAQ / Contact */}
           <div className="text-center">
-            <p className="text-zinc-400 text-sm mb-2">
-              Need a custom plan for 5,000+ calls/month?
+            <p className="text-zinc-400 text-base mb-4">
+              Need a custom plan for high volume?
             </p>
             <button
               onClick={handleContactSales}
-              className="text-blue-400 hover:text-blue-300 text-sm font-medium underline"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-800 rounded-lg text-white hover:border-zinc-700 transition-colors"
             >
-              Contact Sales for Volume Discounts
+              Contact Sales
             </button>
-            <p className="text-zinc-600 text-xs mt-3">
-              All plans include: No setup fees • Cancel anytime • 7-day money-back guarantee
+            <p className="text-zinc-600 text-sm mt-6">
+              No setup fees · Cancel anytime · 7-day money-back guarantee
             </p>
           </div>
         </div>
