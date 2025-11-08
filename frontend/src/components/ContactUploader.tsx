@@ -21,14 +21,14 @@ interface ContactUploaderProps {
 
 const CSV_TEMPLATE = "name,phone\nAbhigyan Raj,9234567890\nSandeep Mehta,9876543210";
 
-// List of voices with local MP3 files
-const ELEVENLABS_FREE_VOICES = [
-  { id: 'RACHEL', name: 'Rachel', gender: 'Female', demo: '/audio/rachel.mp3' },
-  { id: 'DOMI', name: 'Domi', gender: 'Female', demo: '/audio/domi.mp3' },
-  { id: 'BELLA', name: 'Bella', gender: 'Female', demo: '/audio/bella.mp3' },
-  { id: 'ANTONI', name: 'Antoni', gender: 'Male', demo: '/audio/antoni.mp3' },
-  { id: 'THOMAS', name: 'Thomas', gender: 'Male', demo: '/audio/thomas.mp3' },
-  { id: 'JOSH', name: 'Josh', gender: 'Male', demo: '/audio/josh.mp3' },
+// List of Google TTS voices with local MP3 samples
+const GOOGLE_TTS_VOICES = [
+  { id: 'NEERJA', name: 'Neerja', gender: 'Female', type: 'Neural2', demo: '/audio/voice-samples/neerja_neerja.mp3', description: 'Indian English (Premium)' },
+  { id: 'DIVYA', name: 'Divya', gender: 'Female', type: 'Neural2', demo: '/audio/voice-samples/divya_divya.mp3', description: 'Indian English Alt (Premium)' },
+  { id: 'ADITI', name: 'Aditi', gender: 'Female', type: 'Wavenet', demo: '/audio/voice-samples/aditi_aditi.mp3', description: 'Indian English (High Quality)' },
+  { id: 'PRABHAT', name: 'Prabhat', gender: 'Male', type: 'Neural2', demo: '/audio/voice-samples/prabhat_prabhat.mp3', description: 'Indian English (Premium)' },
+  { id: 'KAVYA', name: 'Kavya', gender: 'Male', type: 'Neural2', demo: '/audio/voice-samples/kavya_kavya.mp3', description: 'Indian English Alt (Premium)' },
+  { id: 'RAVI', name: 'Ravi', gender: 'Male', type: 'Wavenet', demo: '/audio/voice-samples/ravi_ravi.mp3', description: 'Indian English (High Quality)' },
 ];
 
 const LANGUAGES = [
@@ -55,7 +55,7 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [calling, setCalling] = useState(false);
-  const [selectedVoice, setSelectedVoice] = useState('RACHEL');
+  const [selectedVoice, setSelectedVoice] = useState('NEERJA');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
@@ -80,7 +80,7 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
     setPlayingVoice(null);
 
     // Get the direct MP3 URL for this voice
-    const voice = ELEVENLABS_FREE_VOICES.find(v => v.id === voiceId);
+    const voice = GOOGLE_TTS_VOICES.find(v => v.id === voiceId);
     if (!voice) {
       setError(`Voice ${voiceId} not found`);
       return;
@@ -554,8 +554,8 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
           aria-expanded={dropdownOpen}
         >
           <span className="flex items-center gap-2">
-            <span className="font-medium">{ELEVENLABS_FREE_VOICES.find(v => v.id === selectedVoice)?.name}</span>
-            <span className="text-xs text-zinc-500">({ELEVENLABS_FREE_VOICES.find(v => v.id === selectedVoice)?.gender})</span>
+            <span className="font-medium">{GOOGLE_TTS_VOICES.find(v => v.id === selectedVoice)?.name}</span>
+            <span className="text-xs text-zinc-500">({GOOGLE_TTS_VOICES.find(v => v.id === selectedVoice)?.gender})</span>
           </span>
           <svg className={`w-4 h-4 ml-2 transition-transform text-zinc-400 ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
         </button>
@@ -565,7 +565,7 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
             tabIndex={-1}
             role="listbox"
           >
-            {ELEVENLABS_FREE_VOICES.map(v => (
+            {GOOGLE_TTS_VOICES.map(v => (
               <li
                 key={v.id}
                 className={`flex items-center justify-between px-3 py-2.5 cursor-pointer text-sm transition-colors ${selectedVoice === v.id ? 'bg-blue-600 text-white' : 'hover:bg-zinc-700 text-zinc-200'}`}
@@ -574,13 +574,16 @@ const ContactUploader: React.FC<ContactUploaderProps> = ({ onSubmit, onClose, se
                 aria-selected={selectedVoice === v.id}
                 tabIndex={0}
               >
-                <span className="flex items-center gap-2">
-                  <span className="font-medium">{v.name}</span>
-                  <span className="text-xs text-zinc-400">({v.gender})</span>
-                </span>
+                <div className="flex flex-col gap-0.5 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="font-medium">{v.name}</span>
+                    <span className="text-xs text-zinc-400">({v.gender})</span>
+                  </span>
+                  <span className="text-xs text-zinc-500">{v.description}</span>
+                </div>
                 <button
                   type="button"
-                  className="ml-2 p-1.5 rounded-full hover:bg-white/10 focus:outline-none transition-colors"
+                  className="ml-2 p-1.5 rounded-full hover:bg-white/10 focus:outline-none transition-colors flex-shrink-0"
                   onClick={e => { e.stopPropagation(); playDemo(v.id); }}
                   disabled={playingVoice === v.id}
                   aria-label={`Play sample for ${v.name}`}

@@ -3,7 +3,8 @@ import fetch from 'node-fetch';
 
 // Google Cloud TTS Configuration
 // Support both GOOGLE_TTS_API_KEY and GOOGLE_API_KEY for flexibility
-const GOOGLE_TTS_API_KEY = process.env.GOOGLE_TTS_API_KEY || process.env.GOOGLE_API_KEY;
+// Use a function to get the key dynamically (allows dotenv to load first)
+const getApiKey = () => process.env.GOOGLE_TTS_API_KEY || process.env.GOOGLE_API_KEY;
 const GOOGLE_TTS_ENDPOINT = 'https://texttospeech.googleapis.com/v1/text:synthesize';
 
 // Available Indian English voices
@@ -67,6 +68,7 @@ let usageStats = {
  * Using REST API with API Key (simpler than service account)
  */
 export async function generateGoogleTTS(text, voiceType = 'NEERJA', options = {}) {
+  const GOOGLE_TTS_API_KEY = getApiKey();
   if (!GOOGLE_TTS_API_KEY) {
     throw new Error('Google TTS API key not configured');
   }
@@ -144,6 +146,7 @@ export async function generateGoogleTTS(text, voiceType = 'NEERJA', options = {}
  * Test Google TTS connection and API key
  */
 export async function testGoogleTTS() {
+  const GOOGLE_TTS_API_KEY = getApiKey();
   console.log('\n🧪 Testing Google TTS API...');
   console.log('API Key configured:', !!GOOGLE_TTS_API_KEY);
   

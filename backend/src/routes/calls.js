@@ -84,8 +84,8 @@ const HYBRID_CONFIG = {
     LOW: ['greeting', 'confirmation', 'decline', 'final', 'first_question', 'outro', 'key_questions'] // All use Twilio TTS
   },
   
-  // Voice settings
-  ELEVENLABS_VOICE: 'RACHEL',
+  // Voice settings (updated to Google TTS)
+  DEFAULT_VOICE: 'NEERJA',
   TWILIO_VOICE: 'Polly.Aditi',
   TWILIO_LANGUAGE: 'en-IN'
 };
@@ -399,7 +399,7 @@ router.post('/initiate', protect, async (req, res) => {
         webhookUrl.searchParams.set('customerName', customerName);
         webhookUrl.searchParams.set('phoneNumber', formattedPhone);
         webhookUrl.searchParams.set('step', '0');
-        webhookUrl.searchParams.set('selectedVoice', selectedVoice || 'RACHEL');
+        webhookUrl.searchParams.set('selectedVoice', selectedVoice || 'NEERJA');
 
         const statusCallbackUrl = new URL(`${publicUrl}/api/calls/status`);
         
@@ -641,7 +641,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
     let step = parseInt(req.query.step || req.body.step || '0');
     const phoneNumber = req.query.phoneNumber || req.body.phoneNumber;
     const previousResponse = req.body.SpeechResult || '';
-    const selectedVoice = req.query.selectedVoice || req.body.selectedVoice || 'RACHEL'; // Get selectedVoice from query or body
+    const selectedVoice = req.query.selectedVoice || req.body.selectedVoice || 'NEERJA'; // Get selectedVoice from query or body
 
     console.log('\n=== Handle Call Webhook ===');
     console.log('Module ID:', moduleId);

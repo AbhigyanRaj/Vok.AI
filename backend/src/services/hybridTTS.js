@@ -44,11 +44,36 @@ const VOICE_MAPPING = {
     google: 'RAVI',
     elevenlabs: 'THOMAS',
     twilio: 'Polly.Raveena'
+  },
+  // Direct Google TTS voice mappings (for frontend voice selection)
+  NEERJA: {
+    google: 'NEERJA',
+    twilio: 'Polly.Aditi'
+  },
+  DIVYA: {
+    google: 'DIVYA',
+    twilio: 'Polly.Aditi'
+  },
+  ADITI: {
+    google: 'ADITI',
+    twilio: 'Polly.Aditi'
+  },
+  PRABHAT: {
+    google: 'PRABHAT',
+    twilio: 'Polly.Raveena'
+  },
+  KAVYA: {
+    google: 'KAVYA',
+    twilio: 'Polly.Raveena'
+  },
+  RAVI: {
+    google: 'RAVI',
+    twilio: 'Polly.Raveena'
   }
 };
 
-// Default voice
-const DEFAULT_VOICE = 'FEMALE_INDIAN';
+// Default voice (use specific Google voice for consistency)
+const DEFAULT_VOICE = 'NEERJA';
 
 // Usage tracking
 let ttsUsageStats = {
