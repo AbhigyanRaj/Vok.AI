@@ -2,11 +2,8 @@ import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import * as auth from "../lib/auth";
 import { Button } from "./ui/button";
-import { Plus, X, Loader2 } from "lucide-react";
+import { Plus, X, Loader2, Languages } from "lucide-react";
 import Modal from "./ui/modal";
-
-// Translation feature removed - unreliable unofficial API
-// Users can create modules in any language directly
 
 interface CreateModuleProps {
   open: boolean;
@@ -20,9 +17,40 @@ const CreateModule: React.FC<CreateModuleProps> = ({ open, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [translating, setTranslating] = useState<number | null>(null);
 
   const addQuestion = () => {
     setQuestions([...questions, ""]);
+  };
+
+  const translateToHindi = async (index: number) => {
+    const questionText = questions[index].trim();
+    if (!questionText) {
+      setError("Please enter a question before translating");
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+
+    setTranslating(index);
+    try {
+      // Using Google Translate API via MyMemory (free, no API key needed)
+      const response = await fetch(
+        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(questionText)}&langpair=en|hi`
+      );
+      const data = await response.json();
+      
+      if (data.responseData && data.responseData.translatedText) {
+        updateQuestion(index, data.responseData.translatedText);
+      } else {
+        throw new Error("Translation failed");
+      }
+    } catch (err) {
+      setError("Translation failed. Please try again.");
+      setTimeout(() => setError(""), 3000);
+      console.error("Translation error:", err);
+    } finally {
+      setTranslating(null);
+    }
   };
 
   const removeQuestion = (index: number) => {
@@ -128,8 +156,21 @@ const CreateModule: React.FC<CreateModuleProps> = ({ open, onClose }) => {
                     onChange={(e) => updateQuestion(index, e.target.value)}
                     className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm"
                     placeholder={`Question ${index + 1}...`}
-                    disabled={loading}
+                    disabled={loading || translating === index}
                   />
+                  <button
+                    type="button"
+                    onClick={() => translateToHindi(index)}
+                    className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={loading || translating === index || !question.trim()}
+                    title="Translate to Hindi"
+                  >
+                    {translating === index ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Languages className="w-4 h-4" />
+                    )}
+                  </button>
                   {questions.length > 1 && (
                     <button
                       type="button"

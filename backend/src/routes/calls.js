@@ -18,6 +18,20 @@ const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
+// Helper function to get language-specific STT configuration
+function getSTTConfig(selectedLanguage = 'english') {
+  if (selectedLanguage.toLowerCase() === 'hindi') {
+    return {
+      language: 'hi-IN',
+      hints: 'हाँ,नहीं,ठीक है,जी,बिल्कुल,शायद,अच्छा,सही,जरूर,कभी नहीं,interested,not interested'
+    };
+  }
+  return {
+    language: 'en-US',
+    hints: 'yes,no,okay,sure,go ahead,yeah,hmm,uh huh,alright,fine,good,great,interested,not interested,maybe,definitely,absolutely,never,sounds good'
+  };
+}
+
 // AI Response Analysis Function
 async function analyzeCustomerResponse(response, question) {
   try {
@@ -761,6 +775,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
 
       console.log('Next URL for step 1:', nextUrl.toString());
 
+      const sttConfig = getSTTConfig(selectedLanguage);
       const gather = twimlResponse.gather({
         input: 'speech',
         action: nextUrl.toString(),
@@ -769,8 +784,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         speechTimeout: 1.5,
         speechModel: 'experimental_conversations',
         enhanced: true,
-        language: 'en-US',
-        hints: 'yes,no,okay,sure,go ahead,yeah,hmm,uh huh,alright,fine,good,great,interested,not interested,maybe,definitely,absolutely,never,sounds good'
+        language: sttConfig.language,
+        hints: sttConfig.hints
       });
 
     } else if (step === 1) {
@@ -778,9 +793,9 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       const callId = req.query.callId || req.body.callId || `webhook_${Date.now()}`;
       
       if (previousResponse && previousResponse.trim().length > 0) {
-        // Customer responded - check if positive (more flexible matching)
-        const positiveWords = ['yes', 'okay', 'sure', 'go ahead', 'yeah', 'yep', 'yup', 'hmm', 'uh huh', 'alright', 'fine', 'good', 'great', 'sounds good', 'perfect'];
-        const negativeWords = ['no', 'not now', 'busy', 'later', 'bad time', 'cannot', 'can\'t'];
+        // Customer responded - check if positive (more flexible matching with Hindi support)
+        const positiveWords = ['yes', 'okay', 'sure', 'go ahead', 'yeah', 'yep', 'yup', 'hmm', 'uh huh', 'alright', 'fine', 'good', 'great', 'sounds good', 'perfect', 'हाँ', 'हां', 'जी', 'ठीक', 'बिल्कुल', 'अच्छा', 'सही', 'जरूर'];
+        const negativeWords = ['no', 'not now', 'busy', 'later', 'bad time', 'cannot', 'can\'t', 'नहीं', 'नही', 'बाद में', 'व्यस्त'];
         
         const responseText = previousResponse.toLowerCase().trim();
         const isPositive = positiveWords.some(word => responseText.includes(word));
@@ -815,6 +830,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           nextUrl.searchParams.set('selectedLanguage', selectedLanguage);
           nextUrl.searchParams.set('callId', callId);
 
+          const sttConfig = getSTTConfig(selectedLanguage);
           twimlResponse.gather({
             input: 'speech',
             action: nextUrl.toString(),
@@ -823,8 +839,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
             speechTimeout: 'auto',
             speechModel: 'experimental_conversations',
             enhanced: true,
-            language: 'en-US',
-            hints: 'yes,no,okay,sure,interested,not interested,maybe,definitely,absolutely,never,sounds good,great,fine,alright'
+            language: sttConfig.language,
+            hints: sttConfig.hints
           });
 
         } else {
@@ -927,6 +943,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           retryUrl.searchParams.set('callId', callId);
           retryUrl.searchParams.set('retryCount', (retryCount + 1).toString());
           
+          const sttConfig = getSTTConfig(selectedLanguage);
           const gather = twimlResponse.gather({
             input: 'speech',
             action: retryUrl.toString(),
@@ -935,8 +952,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
             speechTimeout: 'auto',
             speechModel: 'experimental_conversations',
             enhanced: true,
-            language: 'en-US',
-            hints: 'yes,no,okay,sure,interested,not interested,maybe,definitely,absolutely,never,sounds good,great,fine,alright'
+            language: sttConfig.language,
+            hints: sttConfig.hints
           });
           
           // Prompt user to answer
@@ -1125,6 +1142,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         nextUrl.searchParams.set('selectedVoice', selectedVoice);
         nextUrl.searchParams.set('callId', callId);
 
+        const sttConfig = getSTTConfig(selectedLanguage);
         const gather = twimlResponse.gather({
           input: 'speech',
           action: nextUrl.toString(),
@@ -1133,8 +1151,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           speechTimeout: 'auto',
           speechModel: 'experimental_conversations',
           enhanced: true,
-          language: 'en-US',
-          hints: 'yes,no,okay,sure,interested,not interested,maybe,definitely,absolutely,never,sounds good,great,fine,alright'
+          language: sttConfig.language,
+          hints: sttConfig.hints
         });
         
         // Ask the NEXT question (not the current one we just answered)
