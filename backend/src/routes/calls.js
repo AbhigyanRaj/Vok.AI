@@ -779,14 +779,20 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       const gather = twimlResponse.gather({
         input: 'speech',
         action: nextUrl.toString(),
-        timeout: 3,
+        timeout: 5,
         method: 'POST',
-        speechTimeout: 1.5,
+        speechTimeout: 'auto',
         speechModel: 'experimental_conversations',
         enhanced: true,
         language: sttConfig.language,
         hints: sttConfig.hints
       });
+      
+      // Add a pause inside gather to wait for user response
+      gather.pause({ length: 1 });
+
+      // If no response, redirect to handle no-response
+      twimlResponse.redirect(nextUrl.toString());
 
     } else if (step === 1) {
       // Check if customer confirmed availability
