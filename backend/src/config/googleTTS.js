@@ -9,11 +9,13 @@ const GOOGLE_TTS_ENDPOINT = 'https://texttospeech.googleapis.com/v1/text:synthes
 
 // Available Indian English voices
 export const GOOGLE_VOICES = {
+  // English voices
   NEERJA: {
     id: 'en-IN-Neural2-A',
     name: 'Neerja',
     gender: 'FEMALE',
     type: 'Neural2',
+    language: 'en-IN',
     description: 'Indian English Female (Premium)'
   },
   PRABHAT: {
@@ -21,6 +23,7 @@ export const GOOGLE_VOICES = {
     name: 'Prabhat',
     gender: 'MALE',
     type: 'Neural2',
+    language: 'en-IN',
     description: 'Indian English Male (Premium)'
   },
   KAVYA: {
@@ -28,6 +31,7 @@ export const GOOGLE_VOICES = {
     name: 'Kavya',
     gender: 'MALE',
     type: 'Neural2',
+    language: 'en-IN',
     description: 'Indian English Male Alt (Premium)'
   },
   DIVYA: {
@@ -35,14 +39,15 @@ export const GOOGLE_VOICES = {
     name: 'Divya',
     gender: 'FEMALE',
     type: 'Neural2',
+    language: 'en-IN',
     description: 'Indian English Female Alt (Premium)'
   },
-  // Wavenet voices (also high quality)
   ADITI: {
     id: 'en-IN-Wavenet-A',
     name: 'Aditi',
     gender: 'FEMALE',
     type: 'Wavenet',
+    language: 'en-IN',
     description: 'Indian English Female (High Quality)'
   },
   RAVI: {
@@ -50,7 +55,57 @@ export const GOOGLE_VOICES = {
     name: 'Ravi',
     gender: 'MALE',
     type: 'Wavenet',
+    language: 'en-IN',
     description: 'Indian English Male (High Quality)'
+  },
+  // Hindi voices
+  NEERJA_HI: {
+    id: 'hi-IN-Neural2-A',
+    name: 'Neerja',
+    gender: 'FEMALE',
+    type: 'Neural2',
+    language: 'hi-IN',
+    description: 'Hindi Female (Premium)'
+  },
+  PRABHAT_HI: {
+    id: 'hi-IN-Neural2-B',
+    name: 'Prabhat',
+    gender: 'MALE',
+    type: 'Neural2',
+    language: 'hi-IN',
+    description: 'Hindi Male (Premium)'
+  },
+  KAVYA_HI: {
+    id: 'hi-IN-Neural2-C',
+    name: 'Kavya',
+    gender: 'MALE',
+    type: 'Neural2',
+    language: 'hi-IN',
+    description: 'Hindi Male Alt (Premium)'
+  },
+  DIVYA_HI: {
+    id: 'hi-IN-Neural2-D',
+    name: 'Divya',
+    gender: 'FEMALE',
+    type: 'Neural2',
+    language: 'hi-IN',
+    description: 'Hindi Female Alt (Premium)'
+  },
+  ADITI_HI: {
+    id: 'hi-IN-Wavenet-A',
+    name: 'Aditi',
+    gender: 'FEMALE',
+    type: 'Wavenet',
+    language: 'hi-IN',
+    description: 'Hindi Female (High Quality)'
+  },
+  RAVI_HI: {
+    id: 'hi-IN-Wavenet-B',
+    name: 'Ravi',
+    gender: 'MALE',
+    type: 'Wavenet',
+    language: 'hi-IN',
+    description: 'Hindi Male (High Quality)'
   }
 };
 

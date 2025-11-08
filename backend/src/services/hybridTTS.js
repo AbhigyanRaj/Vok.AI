@@ -69,6 +69,31 @@ const VOICE_MAPPING = {
   RAVI: {
     google: 'RAVI',
     twilio: 'Polly.Raveena'
+  },
+  // Hindi voice mappings
+  NEERJA_HI: {
+    google: 'NEERJA_HI',
+    twilio: 'Polly.Aditi'
+  },
+  DIVYA_HI: {
+    google: 'DIVYA_HI',
+    twilio: 'Polly.Aditi'
+  },
+  ADITI_HI: {
+    google: 'ADITI_HI',
+    twilio: 'Polly.Aditi'
+  },
+  PRABHAT_HI: {
+    google: 'PRABHAT_HI',
+    twilio: 'Polly.Raveena'
+  },
+  KAVYA_HI: {
+    google: 'KAVYA_HI',
+    twilio: 'Polly.Raveena'
+  },
+  RAVI_HI: {
+    google: 'RAVI_HI',
+    twilio: 'Polly.Raveena'
   }
 };
 

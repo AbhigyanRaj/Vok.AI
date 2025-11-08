@@ -10,6 +10,7 @@ import Call from '../models/Call.js';
 import { protect } from '../middleware/auth.js';
 import { broadcastTranscriptUpdate, broadcastCallStatus, cleanupCallClients } from '../websocket/liveCallServer.js';
 import { generateHybridTTS, getTTSUsageStats, listAvailableVoices, testAllTTSServices } from '../services/hybridTTS.js';
+import { getTranslation, getVoiceForLanguage } from '../config/translations.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
@@ -120,9 +121,9 @@ function hasPublicUrl() {
   return baseUrl && !baseUrl.includes('localhost') && !baseUrl.includes('127.0.0.1');
 }
 
-// NEW: Smart Hybrid TTS function with Google TTS (Indian voices) → ElevenLabs → Twilio fallback
-async function generateSmartAudio(text, audioType, callId, twimlResponse, selectedVoice = 'FEMALE_INDIAN', moduleId = null, dbCallId = null) {
-  console.log(`🎤 [${audioType.toUpperCase()}] AI SAYS: "${text}"`);
+// NEW: Smart Hybrid TTS function with Google TTS (Indian voices) → Twilio fallback
+async function generateSmartAudio(text, audioType, callId, twimlResponse, selectedVoice = 'NEERJA', moduleId = null, dbCallId = null, selectedLanguage = 'english') {
+  console.log(`🎤 [${audioType.toUpperCase()}] AI SAYS (${selectedLanguage}): "${text}"`);
   
   // Broadcast AI speech to WebSocket clients using database call ID if available
   const broadcastId = dbCallId || callId;
@@ -141,8 +142,12 @@ async function generateSmartAudio(text, audioType, callId, twimlResponse, select
   }
   
   try {
-    // Use hybrid TTS system (Google → ElevenLabs → Twilio)
-    const result = await generateHybridTTS(text, selectedVoice, {
+    // Get language-appropriate voice
+    const voiceForLanguage = getVoiceForLanguage(selectedVoice, selectedLanguage);
+    console.log(`   Voice mapping: ${selectedVoice} (${selectedLanguage}) → ${voiceForLanguage}`);
+    
+    // Use hybrid TTS system (Google → Twilio)
+    const result = await generateHybridTTS(text, voiceForLanguage, {
       audioType,
       callId
     });
@@ -316,7 +321,7 @@ router.get('/test-elevenlabs-direct', async (req, res) => {
 // Initiate a call - AUTH REQUIRED
 router.post('/initiate', protect, async (req, res) => {
   try {
-    const { moduleId, phoneNumber, customerName, selectedVoice } = req.body;
+    const { moduleId, phoneNumber, customerName, selectedVoice, selectedLanguage } = req.body;
     const userId = req.user._id;
 
     // Validation
@@ -400,6 +405,7 @@ router.post('/initiate', protect, async (req, res) => {
         webhookUrl.searchParams.set('phoneNumber', formattedPhone);
         webhookUrl.searchParams.set('step', '0');
         webhookUrl.searchParams.set('selectedVoice', selectedVoice || 'NEERJA');
+        webhookUrl.searchParams.set('selectedLanguage', selectedLanguage || 'english');
 
         const statusCallbackUrl = new URL(`${publicUrl}/api/calls/status`);
         
@@ -642,12 +648,15 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
     const phoneNumber = req.query.phoneNumber || req.body.phoneNumber;
     const previousResponse = req.body.SpeechResult || '';
     const selectedVoice = req.query.selectedVoice || req.body.selectedVoice || 'NEERJA'; // Get selectedVoice from query or body
+    const selectedLanguage = req.query.selectedLanguage || req.body.selectedLanguage || 'english'; // Get selectedLanguage from query or body
 
     console.log('\n=== Handle Call Webhook ===');
     console.log('Module ID:', moduleId);
     console.log('Customer:', customerName);
     console.log('Step:', step);
     console.log('Phone:', phoneNumber);
+    console.log('Selected Voice:', selectedVoice);
+    console.log('Selected Language:', selectedLanguage);
     console.log('Previous Response:', previousResponse);
     console.log('Request Body:', req.body);
     console.log('Request Query:', req.query);
@@ -726,14 +735,16 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       }
       
       // Use smart hybrid for greeting (HIGH PRIORITY)
+      const greetingText = getTranslation(selectedLanguage, 'greeting', 'default', { name: customerName, company: 'Vok AI' });
       await generateSmartAudio(
-        `Hello ${customerName}, this is an automated call from Vok AI. We have a few important questions that will only take 2-3 minutes of your time. Is now a good time to speak with you?`,
+        greetingText,
         'greeting',
         callId,
         twimlResponse,
         selectedVoice,
         moduleId,
-        call ? call._id.toString() : null
+        call ? call._id.toString() : null,
+        selectedLanguage
       );
 
       const nextUrl = new URL(`${process.env.BASE_URL}/api/calls/handle-call`);
@@ -742,6 +753,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
       nextUrl.searchParams.set('step', '1');
       nextUrl.searchParams.set('phoneNumber', phoneNumber);
       nextUrl.searchParams.set('selectedVoice', selectedVoice);
+      nextUrl.searchParams.set('selectedLanguage', selectedLanguage);
       nextUrl.searchParams.set('callId', callId); // Pass callId for tracking
 
       console.log('Next URL for step 1:', nextUrl.toString());
@@ -777,14 +789,16 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           console.log('🎯 Moving to questions...');
           
           // Use smart hybrid for confirmation and first question together
+          const confirmationText = getTranslation(selectedLanguage, 'confirmation', 'proceed');
           await generateSmartAudio(
-            `Perfect! Thank you for your time. I will now ask you a few quick questions. Please speak clearly after each question. Here's the first question: ${questions[0].question}`,
+            `${confirmationText} ${questions[0].question}`,
             'confirmation',
             callId,
             twimlResponse,
             selectedVoice,
             moduleId,
-            call ? call._id.toString() : null
+            call ? call._id.toString() : null,
+            selectedLanguage
           );
           
           twimlResponse.pause({ length: 0.5 });
@@ -795,6 +809,7 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           nextUrl.searchParams.set('step', '2');
           nextUrl.searchParams.set('phoneNumber', phoneNumber);
           nextUrl.searchParams.set('selectedVoice', selectedVoice);
+          nextUrl.searchParams.set('selectedLanguage', selectedLanguage);
           nextUrl.searchParams.set('callId', callId);
 
           twimlResponse.gather({
@@ -814,13 +829,16 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           console.log('📞 Ending call gracefully...');
           
           // Use smart hybrid for decline message
+          const declineText = getTranslation(selectedLanguage, 'decline', 'message');
           await generateSmartAudio(
-            "I completely understand. Thank you for your time today. We'll reach out at a more convenient time. Have a wonderful day!",
+            declineText,
             'decline',
             callId,
             twimlResponse,
             selectedVoice,
-            moduleId
+            moduleId,
+            null,
+            selectedLanguage
           );
           
           twimlResponse.hangup();
@@ -847,13 +865,16 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
         console.log('📞 Handling gracefully...');
         
         // Use smart hybrid for no response message
+        const noResponseText = getTranslation(selectedLanguage, 'noResponse', 'message');
         await generateSmartAudio(
-          "It looks like this might not be the right time to call. No worries at all! We'll reach out to you again at a more convenient time. Thank you and have a great day!",
+          noResponseText,
           'no_response',
           callId,
           twimlResponse,
           selectedVoice,
-          moduleId
+          moduleId,
+          null,
+          selectedLanguage
         );
         
         twimlResponse.hangup();
@@ -916,13 +937,16 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           });
           
           // Prompt user to answer
+          const retryText = getTranslation(selectedLanguage, 'retryPrompt', 'message');
           await generateSmartAudio(
-            "I didn't catch that. Could you please answer the question? Please speak clearly.",
+            retryText,
             'retry_prompt',
             callId,
             gather,
             selectedVoice,
-            moduleId
+            moduleId,
+            null,
+            selectedLanguage
           );
           
           return res.type('text/xml').send(twimlResponse.toString());
@@ -1025,12 +1049,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           return ['yes', 'yeah', 'sure', 'interested', 'definitely'].some(word => analysis.includes(word));
         });
         
-        let thankYouMessage = '';
-        if (positiveResponses.length > allResponses.length / 2) {
-          thankYouMessage = `Excellent! Thank you so much for taking the time to answer all our questions. Based on your positive responses, our team will be in touch with you soon with more details.`;
-        } else {
-          thankYouMessage = `Thank you so much for taking the time to answer all our questions. Your honest feedback is very valuable to us, and we appreciate your time.`;
-        }
+        // Use translated outro message
+        const thankYouMessage = getTranslation(selectedLanguage, 'outro', 'default', { name: customerName });
         
         // Broadcast AI outro message to WebSocket clients
         try {
@@ -1053,20 +1073,23 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           twimlResponse,
           selectedVoice,
           moduleId,
-          call ? call._id.toString() : null
+          call ? call._id.toString() : null,
+          selectedLanguage
         );
         
         twimlResponse.pause({ length: 0.2 });
         
         // Use smart hybrid for final message
+        const finalText = getTranslation(selectedLanguage, 'final', 'message');
         await generateSmartAudio(
-          'Our team will carefully review your responses. Thank you for choosing Vok AI, and have a wonderful day!',
+          finalText,
           'final',
           callId,
           twimlResponse,
           selectedVoice,
           moduleId,
-          call ? call._id.toString() : null
+          call ? call._id.toString() : null,
+          selectedLanguage
         );
         
         twimlResponse.hangup();
@@ -1119,7 +1142,8 @@ router.post('/handle-call', validateTwilioRequest, async (req, res) => {
           gather,
           selectedVoice,
           moduleId,
-          call ? call._id.toString() : null
+          call ? call._id.toString() : null,
+          selectedLanguage
         );
         
         console.log(`❓ Asked question ${nextQuestionIndex + 1}: ${questions[nextQuestionIndex].question}`);

@@ -5,7 +5,7 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
 // API service for backend communication
 export const api = {
   // Call management - AUTH REQUIRED
-  async initiateCall(token: string, moduleId: string, phoneNumber: string, customerName: string, selectedVoice?: string) {
+  async initiateCall(token: string, moduleId: string, phoneNumber: string, customerName: string, selectedVoice?: string, selectedLanguage?: string) {
     const response = await fetch(`${API_BASE_URL}/calls/initiate`, {
       method: 'POST',
       headers: {
@@ -16,7 +16,8 @@ export const api = {
         moduleId,
         phoneNumber,
         customerName,
-        selectedVoice, // Add the selectedVoice parameter to the request body
+        selectedVoice,
+        selectedLanguage, // Add the selectedLanguage parameter to the request body
       }),
     });
     return response.json();
