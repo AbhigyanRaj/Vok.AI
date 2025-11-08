@@ -144,7 +144,10 @@ async function generateSmartAudio(text, audioType, callId, twimlResponse, select
   try {
     // Get language-appropriate voice
     const voiceForLanguage = getVoiceForLanguage(selectedVoice, selectedLanguage);
-    console.log(`   Voice mapping: ${selectedVoice} (${selectedLanguage}) → ${voiceForLanguage}`);
+    console.log(`\n🎯 TTS Voice Selection:`);
+    console.log(`   Selected Voice: ${selectedVoice}`);
+    console.log(`   Selected Language: ${selectedLanguage}`);
+    console.log(`   Final Voice ID: ${voiceForLanguage}`);
     
     // Use hybrid TTS system (Google → Twilio)
     const result = await generateHybridTTS(text, voiceForLanguage, {

@@ -246,6 +246,9 @@ export async function generateHybridTTS(text, voiceType = DEFAULT_VOICE, options
 async function tryGoogleTTS(text, voiceType) {
   try {
     const googleVoice = VOICE_MAPPING[voiceType]?.google || 'NEERJA';
+    console.log(`   🔍 Voice mapping lookup: ${voiceType} → ${googleVoice}`);
+    console.log(`   📋 Available in VOICE_MAPPING: ${Object.keys(VOICE_MAPPING).includes(voiceType)}`);
+    
     const audioBuffer = await generateGoogleTTS(text, googleVoice);
     
     return {

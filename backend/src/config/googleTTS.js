@@ -136,8 +136,12 @@ export async function generateGoogleTTS(text, voiceType = 'NEERJA', options = {}
     volumeGainDb = 0.0,  // -96.0 to 16.0
   } = options;
 
-  console.log(`🎤 [Google TTS] Generating speech with voice: ${voice.name} (${voice.id})`);
-  console.log(`📝 Text length: ${text.length} characters`);
+  console.log(`\n🎤 [Google TTS] Voice Configuration:`);
+  console.log(`   Requested voiceType: ${voiceType}`);
+  console.log(`   Found in GOOGLE_VOICES: ${!!GOOGLE_VOICES[voiceType]}`);
+  console.log(`   Using voice: ${voice.name} (${voice.id})`);
+  console.log(`   Language: ${voice.language}`);
+  console.log(`   Text length: ${text.length} characters`);
 
   try {
     const requestBody = {
@@ -145,7 +149,7 @@ export async function generateGoogleTTS(text, voiceType = 'NEERJA', options = {}
         text: text
       },
       voice: {
-        languageCode: 'en-IN',
+        languageCode: voice.language,  // Use the language from voice config (en-IN or hi-IN)
         name: voice.id,
         ssmlGender: voice.gender
       },

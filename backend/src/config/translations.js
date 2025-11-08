@@ -99,10 +99,17 @@ export function getTranslation(language = 'english', category, key = 'default', 
  * @returns {string} Voice ID with language suffix if needed
  */
 export function getVoiceForLanguage(baseVoice, language = 'english') {
+  // Ensure baseVoice is uppercase for consistency
+  const normalizedVoice = baseVoice.toUpperCase();
+  
   if (language.toLowerCase() === 'hindi') {
-    // Append _HI suffix for Hindi voices
-    return baseVoice.includes('_HI') ? baseVoice : `${baseVoice}_HI`;
+    // Append _HI suffix for Hindi voices if not already present
+    const hindiVoice = normalizedVoice.includes('_HI') ? normalizedVoice : `${normalizedVoice}_HI`;
+    console.log(`🌐 Voice language mapping: ${baseVoice} + Hindi → ${hindiVoice}`);
+    return hindiVoice;
   }
   // Remove _HI suffix for English voices
-  return baseVoice.replace('_HI', '');
+  const englishVoice = normalizedVoice.replace('_HI', '');
+  console.log(`🌐 Voice language mapping: ${baseVoice} + English → ${englishVoice}`);
+  return englishVoice;
 }
